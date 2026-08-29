@@ -1,4 +1,7 @@
 #include "ft_ping.h"
+#include <stdint.h>
+#include <stdio.h>
+#include <string.h>
 
 int		parseInput(int argc, char **argv, t_ping *ping)
 {
@@ -30,8 +33,14 @@ int		parseInput(int argc, char **argv, t_ping *ping)
 
 int 	main(int argc, char **argv)
 {
-	t_ping 	*ping = NULL;
-	if (!parseInput(argc, argv, ping))
-		exit(1);
+	t_ping 	ping;
+
+	memset(&ping, 0, sizeof(ping));
+	ping.pid = (uint16_t)getpid();
+	parseInput(argc, argv, &ping);
+	//resolve dns here
+	if (resolveDNS(&ping) != 0)
+		return (1);
+	printf("Hostname's ip: %s\n", ping.ip_str);
 	return (0);
 }

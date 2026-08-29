@@ -24,5 +24,7 @@ typedef struct s_ping {
 	uint16_t	seq;
 }		t_ping;
 
+// dns.c
+int	resolveDNS(t_ping *ping);
 
 #endif
