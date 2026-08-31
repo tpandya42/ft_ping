@@ -42,5 +42,10 @@ int 	main(int argc, char **argv)
 	if (resolveDNS(&ping) != 0)
 		return (1);
 	printf("Hostname's ip: %s\n", ping.ip_str);
+
+	ping.sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); 
+	if (ping.sockfd == -1)
+		return (-1);
+	// generate ICMP header ig
 	return (0);
 }

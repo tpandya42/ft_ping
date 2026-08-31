@@ -1,6 +1,9 @@
 #ifndef FT_PING_H
 # define FT_PING_H
 
+#define PAYLOAD_SIZE 56
+#define PACKET_SIZE (sizeof(struct icmphdr) + PAYLOAD_SIZE)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -13,6 +16,11 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include <signal.h>
+
+typedef struct s_packet {
+	struct icmphdr header;
+	char 		payload[PAYLOAD_SIZE];
+} 	t_packet;
 
 typedef struct s_ping {
 	char	*hostname;
