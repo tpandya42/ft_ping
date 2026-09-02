@@ -34,5 +34,5 @@ typedef struct s_ping {
 
 // dns.c
 int	resolveDNS(t_ping *ping);
-
+void buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq);
 #endif

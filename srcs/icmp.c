@@ -11,7 +11,7 @@
  * Step 3 is to fold carry bits 
  * Step 4 is to do One's complement*/ 
 
-uint16_t calculateChecksum(const void *data, size_t l)
+static uint16_t calculateChecksum(const void *data, size_t l)
 {
 	const uint16_t *words = (const uint16_t *)data;
 	uint32_t sum = 0;
@@ -47,6 +47,6 @@ void 	buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq)
 	gettimeofday(&now, NULL);
 	memcpy(pkt->payload, &now, sizeof(now));
 	for (size_t i = sizeof(now); i < PAYLOAD_SIZE; i++)
-		pkt->payload[i] = (char)(i & OxFF);
+		pkt->payload[i] = (char)(i & 0xFF);
 	pkt->header.checksum = calculateChecksum(pkt, sizeof(*pkt));
 }

@@ -4,7 +4,8 @@ CFLAGS = -Wall -Werror -Wextra
 
 SRC_DIR = srcs
 SRC = $(SRC_DIR)/main.c \
-	  $(SRC_DIR)/dns.c
+	  $(SRC_DIR)/dns.c \
+	  $(SRC_DIR)/icmp.c
 OBJ_DIR = obj
 OBJ = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 INC_DIR = includes
