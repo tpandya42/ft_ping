@@ -17,6 +17,17 @@
 #include <stdint.h>
 #include <signal.h>
 
+typedef struct s_config {
+	int count; //no. of echo req
+	uint8_t	ttl; //time to live
+	uint32_t timeout; // -t flag
+	bool	verbose; // -v
+	bool 	quiet; // -q
+	bool	numeric; // -n
+	int 	timeout_ms; // -W
+	int 	packet_size; // -s
+} t_config;
+
 typedef struct s_packet {
 	struct icmphdr header;
 	char 		payload[PAYLOAD_SIZE];
@@ -31,6 +42,9 @@ typedef struct s_ping {
 	uint16_t	pid;
 	uint16_t	seq;
 }		t_ping;
+
+// parsing.c
+int	parseInput(int argc, char **argv, t_ping *ping);
 
 // dns.c
 int	resolveDNS(t_ping *ping);
