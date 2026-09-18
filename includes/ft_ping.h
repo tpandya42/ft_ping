@@ -16,6 +16,7 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include <signal.h>
+#include <stdbool.h>
 
 typedef struct s_config {
 	int count; //no. of echo req
@@ -44,7 +45,7 @@ typedef struct s_ping {
 }		t_ping;
 
 // parsing.c
-t_config	parseInput(char **argv);
+t_config	parseInput(int argc, char **argv);
 // dns.c
 int	resolveDNS(t_ping *ping);
 void buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq);
