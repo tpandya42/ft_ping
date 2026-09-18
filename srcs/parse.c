@@ -1,7 +1,18 @@
 #include "ft_ping.h"
 
-int		parseInput(int argc, char **argv, t_config *conf)
+t_config	parseInput(char **argv)
 {
+	t_config 	conf;
+	memset(&conf, 0, sizeof(conf));
+	conf.count = -1; // by default it is unlimited
+	conf.ttl = 64; // default ttl
+	conf.verbose = false;
+	conf.quiet = false;
+	conf.numeric = false;
+	conf.timeout_ms = 1000; //1s default
+	conf.packet_size = 56;
+	conf.ipv6 = false;
+
 	int		opt;
 	while ((opt = getopt(argc, argv, "v?ctnqTWs")) != -1)
 	{
@@ -16,7 +27,6 @@ int		parseInput(int argc, char **argv, t_config *conf)
 			conf->numeric = true;
 		else if (opt == 'q')
 			conf->quiet = true;
-		else if 
 		else if (opt == 'c') {
 			// parse count
 		}

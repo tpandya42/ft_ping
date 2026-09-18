@@ -68,10 +68,11 @@ int		receivePingReply(t_ping *ping)
 int 	main(int argc, char **argv)
 {
 	t_ping 	ping;
-
+	s_config	*conf;
 	memset(&ping, 0, sizeof(ping));
 	ping.pid = (uint16_t)getpid();
-	parseInput(argc, argv, &ping);
+	conf = parseInput(argv);
+
 	//resolve dns here
 	if (resolveDNS(&ping) != 0)
 		return (1);

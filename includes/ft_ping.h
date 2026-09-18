@@ -20,12 +20,12 @@
 typedef struct s_config {
 	int count; //no. of echo req
 	uint8_t	ttl; //time to live
-	uint32_t timeout; // -t flag
 	bool	verbose; // -v
 	bool 	quiet; // -q
 	bool	numeric; // -n
 	int 	timeout_ms; // -W
 	int 	packet_size; // -s
+	bool 	ipv6;
 } t_config;
 
 typedef struct s_packet {
@@ -44,8 +44,7 @@ typedef struct s_ping {
 }		t_ping;
 
 // parsing.c
-int	parseInput(int argc, char **argv, t_ping *ping);
-
+t_config	parseInput(char **argv);
 // dns.c
 int	resolveDNS(t_ping *ping);
 void buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq);
