@@ -19,6 +19,9 @@
 #include <stdbool.h>
 
 typedef struct s_config {
+	char 	ip_str[INET_ADDRSTRLEN]
+	char 	*hostname;
+	struct 	sockaddr_in target_addr;
 	int count; //no. of echo req
 	uint8_t	ttl; //time to live
 	bool	verbose; // -v
@@ -27,26 +30,31 @@ typedef struct s_config {
 	int 	timeout_ms; // -W
 	int 	packet_size; // -s
 	bool 	ipv6;
+	uint16_t  pid;
 } t_config;
+
+typedef struct s_logs {
+	struct timespec start_time;
+	struct timespec end_time;
+	double rtt_max;
+	double rtt_min;
+	double rtt_sum;
+	double rtt_square_sum;
+} t_logs;
 
 typedef struct s_packet {
 	struct icmphdr header;
 	char 		payload[PAYLOAD_SIZE];
 } 	t_packet;
 
-typedef struct s_ping {
-	char	*hostname;
-	char 	ip_str[INET_ADDRSTRLEN];
-	struct 	sockaddr_in 	target_addr;
-	int 	verbose;
-	int 	sockfd;
-	uint16_t	pid;
-	uint16_t	seq;
-}		t_ping;
 
 // parsing.c
 t_config	parseInput(int argc, char **argv);
 // dns.c
-int	resolveDNS(t_ping *ping);
-void buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq);
+int	resolveDNS(t_conf *conf);
+//ping loop
+int  ipv4_icmp_socket(t_config *conf);
+int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str);
+
+
 #endif

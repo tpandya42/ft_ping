@@ -21,70 +21,27 @@ ssize_t		sendPacket(t_ping *ping, t_packet *pkt)
 	return bytes_sent;
 }
 
-int		receivePingReply(t_ping *ping)
-{
-	char 	buf[1024];
-	struct	sockaddr_in senderAddr;
-	socklen_t	addr_len = sizeof(senderAddr);
-
-	ssize_t bytes_rec = recvfrom(ping->sockfd, buf, sizeof(buf), 0, (struct sockaddr *)&senderAddr, &addr_len);
-	if (bytes_rec < 0)
-	{
-		printf("Request timeout for icmp_seq %d\n", ping->seq);
-		return (-1);
-	}
-
-	struct timeval recvTime;
-	gettimeofday(&recvTime, NULL);
-
-	uint8_t ihl = (buf[0] & 0x0F) * 4;
-	uint8_t ttl = buf[8];
-
-	struct icmphdr *replyICMP = (struct icmphdr *)(buf + ihl);
-	if (replyICMP->type != ICMP_ECHOREPLY){
-		return (-1);
-	}
-	if (ntohs(replyICMP->un.echo.id) != ping->pid)
-		return (-1);
-
-	struct timeval sentTime;
-	memcpy(&sentTime, buf + ihl + sizeof(struct icmphdr), sizeof(sentTime));
-
-	// rrt
-	double rtt = (recvTime.tv_sec - sentTime.tv_sec) * 1000.0 + (recvTime.tv_usec - sentTime.tv_usec) / 1000.0;
-	
-	// printing standard output
-	printf("%ld bytes from %s: icmp_seq=%d ttl=%d time=%.3f ms\n",
-			bytes_rec - ihl,
-			ping->ip_str,
-			ntohs(replyICMP->un.echo.sequence),
-			ttl,
-			rtt
-			);
-
-	return (0);
-}
 
 int 	main(int argc, char **argv)
 {
-	t_ping 	ping;
-	s_config	*conf;
-	memset(&ping, 0, sizeof(ping));
-	ping.pid = (uint16_t)getpid();
-	conf = parseInput(argv);
+	t_config	*conf;
+	conf = parseInput(argc, argv);
 
 	//resolve dns here
-	if (resolveDNS(&ping) != 0)
+	if (resolveDNS(conf) != 0)
 		return (1);
-	printf("Hostname's ip: %s\n", ping.ip_str);
 
-	ping.sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP); 
-	if (ping.sockfd == -1)
-		return (-1);
-	// generate ICMP header ig
-	t_packet pkt;
-	buildPingPacket(&pkt, ping.pid, ping.seq);
-	sendPacket(&ping, &pkt);
-	receivePingReply(&ping);
+	printf("Hostname's ip: %s\n", conf.hostname);
+
+	if(conf.ipv6){
+		// handle ipv6 case here.
+	}
+	else {
+		// handle ipv4 here
+		// Things to do -> resolve dns, send ICMP packet, recieve, print
+		if (resolveDNS(conf) != 0) return 2;
+		ft_pingIpv4(conf, conf->target_addr, conf->ip_str);	
+	}
+
 	return (0);
 }
