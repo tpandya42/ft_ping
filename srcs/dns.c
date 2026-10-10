@@ -10,22 +10,27 @@ int	resolveDNS(t_config *conf)
 	hints.ai_flags = AI_CANONNAME; // input flags controlling resolution behaviour (AI_CANONNAME for canonical names);
 	
 	
-	if (getaddrinfo(ping->hostname, NULL, &hints, &result) != 0){
-		fprintf(stderr, "Unknown hostname '%s'\n", ping->hostname);
+	if (getaddrinfo(conf->hostname, NULL, &hints, &result) != 0){
+		fprintf(stderr, "ft_ping: unknown host %s\n", conf->hostname);
 		return (-1);
 	}
 
-	struct addrinfo ipv4 = result;
-	if (!ipv4)
+	struct addrinfo *rp = NULL;
+	for (rp = result; rp != NULL; rp = rp->ai_next) {
+		if (rp->ai_family == AF_INET)
+			break;
+	}
+	if (!rp)
 	{
-		fprintf(stderr, "ft_ping: no IPv4 address for %s\n", conf.hostname);
+		fprintf(stderr, "ft_ping: no IPv4 address for %s\n", conf->hostname);
 		freeaddrinfo(result);
 		return (-1);
 	}
 
-	conf->target_addr = (struct sockaddr_in *)&ipv4;
+	struct sockaddr_in *addr = (struct sockaddr_in *)rp->ai_addr;
+	conf->target_addr = *addr;
 	
-	const char *ptr = inet_ntop(AF_INET, &(ipv4->sin_addr), conf->ip_str, sizeof(conf->ip_str));
+	const char *ptr = inet_ntop(AF_INET, &addr->sin_addr, conf->ip_str, sizeof(conf->ip_str));
 	if (!ptr)
 	{
 		// fallback to hostname in case conversion fails

@@ -6,7 +6,9 @@ SRC_DIR = srcs
 SRC = $(SRC_DIR)/main.c \
       $(SRC_DIR)/dns.c \
       $(SRC_DIR)/parse.c \
-      $(SRC_DIR)/icmp.c
+      $(SRC_DIR)/icmp.c \
+      $(SRC_DIR)/socket.c \
+      $(SRC_DIR)/ping4.c
 OBJ_DIR = obj
 OBJ = $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 INC_DIR = includes
@@ -15,7 +17,7 @@ INC = -I$(INC_DIR)
 all: $(NAME)
 
 $(NAME): $(OBJ)
-	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME)
+	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME) -lm
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
 	@mkdir -p $(OBJ_DIR)

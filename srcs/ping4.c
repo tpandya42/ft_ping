@@ -1,12 +1,15 @@
 #define _GNU_SOURCE
 #include "ft_ping.h"
+#include <time.h>
+#include <math.h>
 
-static volatile sig_atomic g_sig = 0; 
+static volatile sig_atomic_t g_sig = 0; 
 
 static void handle_sigint(int sig)
 {
 	(void)sig;
-	write (STDOUT, "\n", 1); // print a new line to match iputils behaviour
+	// no i/o here (not async-signal-safe): the empty line before the
+	// statistics is printed by print_summary, matching iputils
 	g_sig = 1;
 }
 
@@ -66,9 +69,63 @@ static bool	parseSeqifOur(uint8_t *buf, ssize_t res, int outer_iphdr_len, uint16
 		*ourSeq = ntohs(inner_icmp->un.echo.sequence);
 		return true;
 	}
-	false;
+	return false;
 }
 
+/* -------------------- log output (inetutils-2.0 style) -------------------- */
+
+static void	print_ping_header(t_config *conf, const char *ip_str)
+{
+	// note: iputils prints this header even with -q
+	printf("PING %s (%s) %d(%d) bytes of data.\n",
+		conf->hostname, ip_str, conf->packet_size,
+		conf->packet_size + (int)sizeof(struct icmphdr) + (int)sizeof(struct iphdr));
+}
+
+static void	print_reply(t_config *conf, const char *from_addr, uint16_t seq,
+		size_t bytes, unsigned ttl, double rtt_ms, bool duplicate)
+{
+	if (conf->quiet)
+		return;
+	printf("%zu bytes from %s: icmp_seq=%u ttl=%u time=%.3f ms",
+		bytes, from_addr, (unsigned)seq, ttl, rtt_ms);
+	if (duplicate && conf->verbose)
+		printf(" (DUP!)");
+	printf("\n");
+}
+
+static void	print_summary(t_config *conf, t_logs *logs, double rtt_sq_sum,
+		unsigned duplicates)
+{
+	// iputils separates the replies from the statistics with an empty line
+	printf("\n--- %s ping statistics ---\n", conf->hostname);
+	long	sec = logs->end_time.tv_sec - logs->start_time.tv_sec;
+	long	nsec = logs->end_time.tv_nsec - logs->start_time.tv_nsec;
+	if (nsec < 0)
+	{
+		sec--;
+		nsec += 1000000000L;
+	}
+	long	elapsed_ms = sec * 1000L + nsec / 1000000L;
+	int	loss = 0;
+	if (logs->sent > 0)
+		loss = (logs->sent - logs->rec) * 100 / logs->sent;
+	printf("%d packets transmitted, %d received, %d%% packet loss, time %ldms\n",
+		logs->sent, logs->rec, loss, elapsed_ms);
+	if (duplicates > 0 && conf->verbose)
+		printf("%u duplicates\n", duplicates);
+	if (logs->rec > 0)
+	{
+		// avg/mdev count every reply's rtt, duplicates included (see note in ft_pingIpv4)
+		unsigned	rtt_count = logs->rec + duplicates;
+		double	avg = logs->rtt_sum / rtt_count;
+		double	var = rtt_sq_sum / rtt_count - avg * avg;
+		if (var < 0.0)
+			var = 0.0;
+		printf("rtt min/avg/max/mdev = %.3f/%.3f/%.3f/%.3f ms\n",
+			logs->rtt_min, avg, logs->rtt_max, sqrt(var));
+	}
+}
 
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 {
@@ -88,9 +145,22 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 	/*NOTE: If duplicate packets are received, they are not included in the packet loss calculation,
 	 	although the rount trip time of these packets is used in calculating the min/max/avg/mdev rtt numbers. */
 	uint16_t seq = 0; 
+	unsigned	duplicates = 0;
+	double		rtt_sq_sum = 0.0; // sum of squared rtt, for mdev
+	bool		have_rtt = false;
 
 	char from_addr[INET_ADDRSTRLEN];
+	uint8_t packet[sizeof(struct icmphdr) + 1500]; // using raw bytes. 1500 is reserving space for ICMP payload in addition to header.
 
+	if (sizeof(struct icmphdr) + (size_t)conf->packet_size > sizeof(packet))
+	{
+		fprintf(stderr, "ft_ping: -s %d: packet size too large\n",
+			conf->packet_size);
+		close(fd);
+		return (-1);
+	}
+
+	print_ping_header(conf, ip_str);
 	clock_gettime(CLOCK_MONOTONIC, &logs.start_time);
 	/*NOTE: CLOCK_MONOTONIC is not affected by discontinous jumps
 	 * in the system time (e.g. manual changes), but is affected by
@@ -101,87 +171,108 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 	{
 		if (conf->count > 0 && logs.rec >= conf->count)
 			break;
-		uint8_t packet[sizeof(struct icmphdr) + 1500]; // using raw bytes. 1500 is reserving space for ICMP payload in addition to header.
-							       
 
 		// build echo packet
-		size_t icmp_len = buildEchoPacket(conf, packet, sizeof(packet), seq + 1, conf->packet_size, conf->pid);
+		struct timespec send_ts;
+		clock_gettime(CLOCK_MONOTONIC, &send_ts);
+		size_t icmp_len = buildEchoPacket(conf, packet, sizeof(packet), seq, conf->pid, &send_ts);
+		if (icmp_len == 0)
+		{
+			fprintf(stderr, "ft_ping: failed to build icmp packet\n");
+			break;
+		}
 
 		// send echo req 
-		size_t sent_bytes = sento(fd, packet, icmp_len, 0, (struct sockaddr_in *)target_addr, sizeof(target_addr));
-		if (sent_bytes < 0) perror("ft_ping: sento");
+		ssize_t sent_bytes = sendto(fd, packet, icmp_len, 0, (struct sockaddr *)target_addr, sizeof(*target_addr));
+		if (sent_bytes < 0) perror("ft_ping: sendto");
 		else {
 			logs.sent++;
 			seq++;	
 		}
 
-		// receive and parse
-		char	buf[2048]; //IOV max is 1024
-		struct sockaddr_in src; memset(&src, 0, sizeof(src));
-		struct msghdr rrecv; memset(&rrecv, 0, sizeof(rrecv));
-		struct iovec	iov; memset(&io, 0, sizeof(rrecv));
-		iov.iov_base = buf; iov.iov_len = sizeof(buf);
-		rrecv.msg_iov = &iov; rrecv.msg_iovlen = 1; // number of elements in msg_iov
-		rrecv.msg_name = &src; rrecv.msg_namelen = sizeof(src);
-		ssize_t res = recvmsg(fd, &rrecv, 0);
-		if (res >= (ssize_t)(sizeof(struct icmphdr) + sizeof(struct iphdr))) // check if packet is big enough
+		// receive and parse. a raw socket also sees our own echo
+		// requests reflected back (e.g. on loopback), so keep reading
+		// until the matching reply or an icmp error for us arrives,
+		// or the socket times out (SO_RCVTIMEO).
+		while (!g_sig)
 		{
+			char	buf[2048]; //IOV max is 1024
+			struct sockaddr_in src; memset(&src, 0, sizeof(src));
+			struct msghdr rrecv; memset(&rrecv, 0, sizeof(rrecv));
+			struct iovec	iov; memset(&iov, 0, sizeof(iov));
+			iov.iov_base = buf; iov.iov_len = sizeof(buf);
+			rrecv.msg_iov = &iov; rrecv.msg_iovlen = 1; // number of elements in msg_iov
+			rrecv.msg_name = &src; rrecv.msg_namelen = sizeof(src);
+			ssize_t res = recvmsg(fd, &rrecv, 0);
+			if (res < (ssize_t)(sizeof(struct icmphdr) + sizeof(struct iphdr)))
+				break; // timeout or nothing usable: move on to the next echo req
 			struct iphdr *ip = (struct iphdr *)buf;
 			int 	iphdr_len = ip->ihl * 4;
-			if (res < iphdr_len + (ssize_t)sizeof(struct icmphdr)) // making sure ICMP header actually exists
-				goto wait_next;
+			if (iphdr_len < (int)sizeof(struct iphdr) // bogus ip header length
+				|| res < iphdr_len + (ssize_t)sizeof(struct icmphdr)) // making sure ICMP header actually exists
+				continue; // keep waiting for our reply
 			// Finding the ICMP header
 			struct icmphdr *icmp = (struct icmphdr *)(buf + iphdr_len); // buf + iphdr_len = start of icmp hdr
 			if (icmp->type == ICMP_ECHOREPLY && ntohs(icmp->un.echo.id) == conf->pid) // check if it is echo reply and if it is our ping (pid)
 			{
-				// record the timestamp of reply (for rtt)
-				clock_gettime(CLOCK_MONOTONIC, &logs.end_time);
+				double rtt_ms = 0.0;
+				struct timespec sent_ts;
 				// finding the timestamp in the ICMP PAYLOAD
 				// buf + IP header + icmp header -> start of payload ( which is timestamp)
 				/* ICMP payload: timespec.tv_sec
 				 		 timespec.tv_nsec
 				 		 other stuff */
-				struct timespec *sent_ts = (struct timespec *)(buf + iphdr + len + sizeof(struct icmphr));
-				double rtt_ms = 0.0;
-				// check if received packet contain complete struct timespec
-				if ((uint8_t*)sent_ts + sizeof(struct timespec) <= buf + res) // buf + res is end of packet
+				if (buf + iphdr_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct timespec) <= buf + res)
 				{
+					memcpy(&sent_ts, buf + iphdr_len + sizeof(struct icmphdr), sizeof(sent_ts));
 					/*Calculating rtt*/
 					struct timespec now;
 					clock_gettime(CLOCK_MONOTONIC, &now);
-					long sec = now.tv_sec - sent_ts->tv_sec;
-					long nsec = now.tv_sec - sent_ts->tv_nsec;
+					long sec = now.tv_sec - sent_ts.tv_sec;
+					long nsec = now.tv_nsec - sent_ts.tv_nsec;
+					if (nsec < 0) // borrow from the seconds part
+					{
+						sec--;
+						nsec += 1000000000L;
+					}
 					rtt_ms = sec * 1000.0 + nsec / 1e6;
+					if (rtt_ms < 0.0)
+						rtt_ms = 0.0;
 				}
-				logs.rec++; // Update recv stat
-				// Update rtt_min and rtt_max
-				if (logs.rec == 1 || rtt_ms < logs.rtt_min) logs.rtt_min = rtt_ms;
-				if (logs.rec == 1 || rtt_ms > logs.rtt_max) logs.rtt_max = rtt_ms;
-
 				// Getting the source IP address
 				inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr)); //src.sin_addr contain binary addr IPv4
 				// Extract the sequence number
 				uint16_t rseq = ntohs(icmp->un.echo.sequence);
 				// Checking for duplicate 
-				bool duplicate = false;
-				if (seen_seq[rseq]){
-					logs.duplicates++;
-					duplicate = true;
-				} else {
-					seen_seq[rseq] = true;
-				}
+				bool duplicate = seen_seq[rseq];
+				seen_seq[rseq] = true;
+				if (duplicate)
+					duplicates++;
+				else
+					logs.rec++; // unique reply, counts toward packet loss stats
+				// rtt of duplicates still feeds min/max/avg/mdev (see note above)
+				logs.rtt_sum += rtt_ms;
+				rtt_sq_sum += rtt_ms * rtt_ms;
+				if (!have_rtt || rtt_ms < logs.rtt_min) logs.rtt_min = rtt_ms;
+				if (!have_rtt || rtt_ms > logs.rtt_max) logs.rtt_max = rtt_ms;
+				have_rtt = true;
 				// print the output here if the queit flag is NOT true;
-
-			} else if (icmp->type != ICMP_ECHOREPLY){ // to show icmp error code for -v
-				inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(fromaddr));
-				const char *error_msg = icmp_desc(icmp->type, icmp_code);
+				print_reply(conf, from_addr, rseq, res - iphdr_len,
+					ip->ttl, rtt_ms, duplicate);
+				break; // got our reply for this round
+			}
+			if (icmp->type == ICMP_ECHO)
+				continue; // our own echoed-back echo request, not a reply
+			if (icmp->type != ICMP_ECHOREPLY){ // to show icmp error code for -v
+				inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr));
+				const char *error_msg = icmp_desc(icmp->type, icmp->code);
 				// to handle verbose information
 				char extra[128]; extra[0] = '\0';
 				if (conf->verbose)
 				{
 					if (icmp->type == ICMP_REDIRECT) {
 						struct in_addr gateway;
-						gateway->s_addr = icmp->un.gateway;
+						gateway.s_addr = icmp->un.gateway;
 						char gwstr[INET_ADDRSTRLEN];
 						if (inet_ntop(AF_INET, &gateway, gwstr, sizeof(gwstr)))
 							snprintf(extra, sizeof(extra), " (new nexthop: %s)", gwstr);
@@ -194,21 +285,22 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 				}
 				// ICMP error packet usually contains part of the original packet that caused the error.
 				uint16_t ourSeq = 0;
-				bool ours = parseSeqifOur(buf, res, iphdr_len, conf->pid, &ourSeq);
+				bool ours = parseSeqifOur((uint8_t *)buf, res, iphdr_len, conf->pid, &ourSeq);
 				if (ours){
 					if (conf->verbose)
 						printf("From %s icmp_seq=%u %s (type=%d code=%d)%s\n", from_addr, (unsigned)ourSeq, error_msg, icmp->type, icmp->code, extra);
 					else
 						printf("From %s %s\n", from_addr, error_msg);
 				}
+				// keep waiting: the error is not the echo reply we asked for
+				continue;
 			}
 		}
-		wait_next;
-		if (conf->count >= 0 && (int)logs.sent >= conf->count)
+		if (conf->count >= 0 && logs.sent >= conf->count)
 			break;
 	}
 	clock_gettime(CLOCK_MONOTONIC, &logs.end_time);
-	print_summary(conf->hostname, &logs);
+	print_summary(conf, &logs, rtt_sq_sum, duplicates);
 	close(fd);
 	return (0);
 }

@@ -16,7 +16,7 @@ t_config	parseInput(int argc,char **argv)
 	conf.pid = (uint16_t)getpid();
 
 	int		opt;
-	while ((opt = getopt(argc, argv, "v?ctnqTWs")) != -1)
+	while ((opt = getopt(argc, argv, "v?6c:t:W:s:qn")) != -1)
 	{
 		if (opt == 'v')
 			conf.verbose = true;
@@ -34,7 +34,7 @@ t_config	parseInput(int argc,char **argv)
 			conf.quiet = true;
 		else if (opt == 'c') {
 			// parse count
-			conf.count = atoi(argv[3]);
+			conf.count = atoi(optarg);
 		}
 		
 		else if (opt == 'T'){
@@ -42,15 +42,15 @@ t_config	parseInput(int argc,char **argv)
 		}
 		else if (opt == 't'){
 			// parse time to live
-			conf.ttl = atoi(argv[3]);
+			conf.ttl = atoi(optarg);
 		}
 		else if (opt == 'W'){
 			// parse timout in ms
-			conf.timeout_ms = atoi(argv[3]);
+			conf.timeout_ms = atoi(optarg);
 		}
 		else if (opt == 's'){
 			// parse packet size
-			conf.packet_size = atoi(argv[3]);
+			conf.packet_size = atoi(optarg);
 		}
 		else {
 			fprintf(stderr, "ft_ping: unrecognized option '%s'\n", argv[optind - 1]);

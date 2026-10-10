@@ -1,6 +1,7 @@
 #ifndef FT_PING_H
 # define FT_PING_H
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,7 +17,7 @@
 #include <stdbool.h>
 
 typedef struct s_config {
-	char 	ip_str[INET_ADDRSTRLEN]
+	char 	ip_str[INET_ADDRSTRLEN];
 	char 	*hostname;
 	struct 	sockaddr_in target_addr;
 	int count; //no. of echo req
@@ -49,9 +50,9 @@ typedef struct s_logs {
 // parsing.c
 t_config	parseInput(int argc, char **argv);
 // dns.c
-int	resolveDNS(t_conf *conf);
+int	resolveDNS(t_config *conf);
 //icmp.c
-size_t	buildEchoPacket(t_config *conf, uint8_t packet, int packetSize, uint16_t seq, int packet_size, uint16_t pid);
+size_t	buildEchoPacket(t_config *conf, uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time);
 //ping loop
 int  ipv4_icmp_socket(t_config *conf);
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str);

@@ -35,28 +35,28 @@ static uint16_t calculateChecksum(const void *data, size_t l)
 }
 
 // TODO: calculate time taken to send a packet.
-size_t	buildEchoPacket(t_config *conf, uint8_t packet, int packetSize, uint16_t seq, int packet_size, uint16_t pid, struct timespec st_time)
+size_t	buildEchoPacket(t_config *conf, uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time)
 { 
 	size_t icmp_len = sizeof(struct icmphdr) + packetSize;
-	if (packetSize < icmp_len)
+	if (packetSize < 0 || (size_t)packetSize > 65535)
 		return 0;
 	struct icmphdr *hdr = (struct icmphdr *)packet;	
-	hdr.type = ICMP_ECHO; // 8
-	hdr.code = 0;
-	hdr.un.echo.id = htons(pid); // our pid in network byte
-	hdr.un.echo.sequence = htons(seq);
-	hdr.checksum = 0;
+	hdr->type = ICMP_ECHO; // 8
+	hdr->code = 0;
+	hdr->un.echo.id = htons(pid); // our pid in network byte
+	hdr->un.echo.sequence = htons(seq);
+	hdr->checksum = 0;
 
-	uint8_t payload = packet + sizeof(struct icmphdr);
-	if (packetSize >= sizeof(timeval) && st_time)
+	uint8_t *payload = packet + sizeof(struct icmphdr);
+	if (st_time && packetSize >= (int)sizeof(struct timespec))
 	{
-		memcpy(payload, &st_time, sizeof(st_time));
-		memset(payload + sizeof(st_time), 0x42, packetSize - sizeof(st_time));
+		memcpy(payload, st_time, sizeof(struct timespec));
+		memset(payload + sizeof(struct timespec), 0x42, packetSize - sizeof(struct timespec));
 	}
 	else
 	{
-		memset(payload, 0x42, packetSize - sizeof(st_time));
+		memset(payload, 0x42, packetSize);
 	}
-	hdr.checksum = calculateChecksum(packet, icmp_len);
+	hdr->checksum = calculateChecksum(packet, icmp_len);
 	return icmp_len;
 }
