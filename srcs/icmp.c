@@ -34,19 +34,29 @@ static uint16_t calculateChecksum(const void *data, size_t l)
 	return (uint16_t)(~sum);
 }
 
-void 	buildPingPacket(t_packet *pkt, uint16_t pid, uint16_t seq)
+// TODO: calculate time taken to send a packet.
+size_t	buildEchoPacket(t_config *conf, uint8_t packet, int packetSize, uint16_t seq, int packet_size, uint16_t pid, struct timespec st_time)
 { 
-	memset(pkt, 0, sizeof(*pkt));
-	pkt->header.type = ICMP_ECHO; // 8
-	pkt->header.code = 0;
-	pkt->header.un.echo.id = htons(pid); // our pid in netword byte
-	pkt->header.un.echo.sequence = htons(seq);
-	pkt->header.checksum = 0;
+	size_t icmp_len = sizeof(struct icmphdr) + packetSize;
+	if (packetSize < icmp_len)
+		return 0;
+	struct icmphdr *hdr = (struct icmphdr *)packet;	
+	hdr.type = ICMP_ECHO; // 8
+	hdr.code = 0;
+	hdr.un.echo.id = htons(pid); // our pid in network byte
+	hdr.un.echo.sequence = htons(seq);
+	hdr.checksum = 0;
 
-	struct timeval	now;
-	gettimeofday(&now, NULL);
-	memcpy(pkt->payload, &now, sizeof(now));
-	for (size_t i = sizeof(now); i < PAYLOAD_SIZE; i++)
-		pkt->payload[i] = (char)(i & 0xFF);
-	pkt->header.checksum = calculateChecksum(pkt, sizeof(*pkt));
+	uint8_t payload = packet + sizeof(struct icmphdr);
+	if (packetSize >= sizeof(timeval) && st_time)
+	{
+		memcpy(payload, &st_time, sizeof(st_time));
+		memset(payload + sizeof(st_time), 0x42, packetSize - sizeof(st_time));
+	}
+	else
+	{
+		memset(payload, 0x42, packetSize - sizeof(st_time));
+	}
+	hdr.checksum = calculateChecksum(packet, icmp_len);
+	return icmp_len;
 }

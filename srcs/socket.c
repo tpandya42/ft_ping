@@ -1,6 +1,5 @@
 #include "ft_ping.h"
 
-
 int  ipv4_icmp_socket(t_config *conf)
 {
 	int fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);

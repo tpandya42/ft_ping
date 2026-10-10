@@ -10,18 +10,6 @@
 #include <unistd.h>
 
 
-ssize_t		sendPacket(t_ping *ping, t_packet *pkt)
-{
-	ssize_t bytes_sent = sendto(ping->sockfd, pkt, sizeof(*pkt), 0, (struct sockaddr *)&ping->target_addr, sizeof(ping->target_addr));
-	if (bytes_sent < 0)
-	{
-		perror("ft_ping: sendto failed");
-		return (-1);
-	}
-	return bytes_sent;
-}
-
-
 int 	main(int argc, char **argv)
 {
 	t_config	*conf;

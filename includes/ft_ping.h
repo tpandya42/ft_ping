@@ -1,9 +1,6 @@
 #ifndef FT_PING_H
 # define FT_PING_H
 
-#define PAYLOAD_SIZE 56
-#define PACKET_SIZE (sizeof(struct icmphdr) + PAYLOAD_SIZE)
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -34,24 +31,27 @@ typedef struct s_config {
 } t_config;
 
 typedef struct s_logs {
-	struct timespec start_time;
+	int	sent;
+	int	rec;
+	struct timespec start_time; // NOTE: time in seconds and nanoseconds.. Data type -> time_t (signed value usually long or long long).
 	struct timespec end_time;
 	double rtt_max;
 	double rtt_min;
 	double rtt_sum;
-	double rtt_square_sum;
+	double rtt_mdev; 
+	/*mdev: Population standard deviation(mdev), essentially an average of how far each ping RTT is from the mean RTT.
+	 * 	The higher mdev is, the more variable the RTT is (over time). With a high RTT variability, you will have speed issues with bulk transfers
+	 * 	(They will take longer than is strictly speaking necessary, as the variability will eventually cause the sender to wait for ACKS) and 
+	 * 	you will have middling to poor VoIP quality.*/
 } t_logs;
-
-typedef struct s_packet {
-	struct icmphdr header;
-	char 		payload[PAYLOAD_SIZE];
-} 	t_packet;
 
 
 // parsing.c
 t_config	parseInput(int argc, char **argv);
 // dns.c
 int	resolveDNS(t_conf *conf);
+//icmp.c
+size_t	buildEchoPacket(t_config *conf, uint8_t packet, int packetSize, uint16_t seq, int packet_size, uint16_t pid);
 //ping loop
 int  ipv4_icmp_socket(t_config *conf);
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str);
