@@ -72,7 +72,6 @@ static bool	parseSeqifOur(uint8_t *buf, ssize_t res, int outer_iphdr_len, uint16
 	return false;
 }
 
-/* -------------------- log output (inetutils-2.0 style) -------------------- */
 
 static void	print_ping_header(t_config *conf, const char *ip_str)
 {
@@ -127,12 +126,20 @@ static void	print_summary(t_config *conf, t_logs *logs, double rtt_sq_sum,
 	}
 }
 
+/* 
+ * seen_seq tracks which sequence numbers we've already received a reply for.
+ * Using static storage to avoid 64KB stack allocation.
+ * Size 65536 covers all possible uint16_t sequence numbers.
+ */
+static bool seen_seq[65536];
+
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 {
 	// open socket
 	int fd = ipv4_icmp_socket(conf);
 	if (fd < 0) return -1;
 	signal(SIGINT, handle_sigint); // ctr + c
+
 	// initialize time stats for printing.
 	t_logs logs;
 	memset(&logs, 0, sizeof(logs));
@@ -165,140 +172,187 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 	/*NOTE: CLOCK_MONOTONIC is not affected by discontinous jumps
 	 * in the system time (e.g. manual changes), but is affected by
 	 * frequency adjustments.*/	
-	bool seen_seq[65536];
 	memset(seen_seq, 0, sizeof(seen_seq));
+
+	// Main ping loop: send packet, wait for reply, sleep 1s, repeat
 	while (!g_sig)
 	{
-		if (conf->count > 0 && logs.rec >= conf->count)
+		// Check count limit BEFORE sending (use sent count, not received)
+		if (conf->count > 0 && logs.sent >= (unsigned)conf->count)
 			break;
 
-		// build echo packet
+		// Retransmit state for current sequence
+		int retransmit = 0;
+		const int max_retransmit = 3; // max retransmits per sequence
+		bool got_reply = false;
 		struct timespec send_ts;
-		clock_gettime(CLOCK_MONOTONIC, &send_ts);
-		size_t icmp_len = buildEchoPacket(conf, packet, sizeof(packet), seq, conf->pid, &send_ts);
-		if (icmp_len == 0)
-		{
-			fprintf(stderr, "ft_ping: failed to build icmp packet\n");
-			break;
-		}
+		size_t icmp_len = 0;
 
-		// send echo req 
-		ssize_t sent_bytes = sendto(fd, packet, icmp_len, 0, (struct sockaddr *)target_addr, sizeof(*target_addr));
-		if (sent_bytes < 0) perror("ft_ping: sendto");
-		else {
-			logs.sent++;
-			seq++;	
-		}
-
-		// receive and parse. a raw socket also sees our own echo
-		// requests reflected back (e.g. on loopback), so keep reading
-		// until the matching reply or an icmp error for us arrives,
-		// or the socket times out (SO_RCVTIMEO).
-		while (!g_sig)
+		// Inner loop: send and wait for reply (with retransmits on timeout)
+		while (!g_sig && !got_reply && retransmit <= max_retransmit)
 		{
-			char	buf[2048]; //IOV max is 1024
-			struct sockaddr_in src; memset(&src, 0, sizeof(src));
-			struct msghdr rrecv; memset(&rrecv, 0, sizeof(rrecv));
-			struct iovec	iov; memset(&iov, 0, sizeof(iov));
-			iov.iov_base = buf; iov.iov_len = sizeof(buf);
-			rrecv.msg_iov = &iov; rrecv.msg_iovlen = 1; // number of elements in msg_iov
-			rrecv.msg_name = &src; rrecv.msg_namelen = sizeof(src);
-			ssize_t res = recvmsg(fd, &rrecv, 0);
-			if (res < (ssize_t)(sizeof(struct icmphdr) + sizeof(struct iphdr)))
-				break; // timeout or nothing usable: move on to the next echo req
-			struct iphdr *ip = (struct iphdr *)buf;
-			int 	iphdr_len = ip->ihl * 4;
-			if (iphdr_len < (int)sizeof(struct iphdr) // bogus ip header length
-				|| res < iphdr_len + (ssize_t)sizeof(struct icmphdr)) // making sure ICMP header actually exists
-				continue; // keep waiting for our reply
-			// Finding the ICMP header
-			struct icmphdr *icmp = (struct icmphdr *)(buf + iphdr_len); // buf + iphdr_len = start of icmp hdr
-			if (icmp->type == ICMP_ECHOREPLY && ntohs(icmp->un.echo.id) == conf->pid) // check if it is echo reply and if it is our ping (pid)
-			{
-				double rtt_ms = 0.0;
-				struct timespec sent_ts;
-				// finding the timestamp in the ICMP PAYLOAD
-				// buf + IP header + icmp header -> start of payload ( which is timestamp)
-				/* ICMP payload: timespec.tv_sec
-				 		 timespec.tv_nsec
-				 		 other stuff */
-				if (buf + iphdr_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct timespec) <= buf + res)
+			// Build echo packet (on first attempt or retransmit)
+			if (retransmit == 0 || icmp_len == 0) {
+				clock_gettime(CLOCK_MONOTONIC, &send_ts);
+				icmp_len = buildEchoPacket(packet, sizeof(packet), seq, conf->pid, &send_ts);
+				if (icmp_len == 0)
 				{
-					memcpy(&sent_ts, buf + iphdr_len + sizeof(struct icmphdr), sizeof(sent_ts));
-					/*Calculating rtt*/
-					struct timespec now;
-					clock_gettime(CLOCK_MONOTONIC, &now);
-					long sec = now.tv_sec - sent_ts.tv_sec;
-					long nsec = now.tv_nsec - sent_ts.tv_nsec;
-					if (nsec < 0) // borrow from the seconds part
-					{
-						sec--;
-						nsec += 1000000000L;
-					}
-					rtt_ms = sec * 1000.0 + nsec / 1e6;
-					if (rtt_ms < 0.0)
-						rtt_ms = 0.0;
+					fprintf(stderr, "ft_ping: failed to build icmp packet\n");
+					got_reply = true; // break out of inner loop
+					break;
 				}
-				// Getting the source IP address
-				inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr)); //src.sin_addr contain binary addr IPv4
-				// Extract the sequence number
-				uint16_t rseq = ntohs(icmp->un.echo.sequence);
-				// Checking for duplicate 
-				bool duplicate = seen_seq[rseq];
-				seen_seq[rseq] = true;
-				if (duplicate)
-					duplicates++;
-				else
-					logs.rec++; // unique reply, counts toward packet loss stats
-				// rtt of duplicates still feeds min/max/avg/mdev (see note above)
-				logs.rtt_sum += rtt_ms;
-				rtt_sq_sum += rtt_ms * rtt_ms;
-				if (!have_rtt || rtt_ms < logs.rtt_min) logs.rtt_min = rtt_ms;
-				if (!have_rtt || rtt_ms > logs.rtt_max) logs.rtt_max = rtt_ms;
-				have_rtt = true;
-				// print the output here if the queit flag is NOT true;
-				print_reply(conf, from_addr, rseq, res - iphdr_len,
-					ip->ttl, rtt_ms, duplicate);
-				break; // got our reply for this round
 			}
-			if (icmp->type == ICMP_ECHO)
-				continue; // our own echoed-back echo request, not a reply
-			if (icmp->type != ICMP_ECHOREPLY){ // to show icmp error code for -v
-				inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr));
-				const char *error_msg = icmp_desc(icmp->type, icmp->code);
-				// to handle verbose information
-				char extra[128]; extra[0] = '\0';
-				if (conf->verbose)
-				{
-					if (icmp->type == ICMP_REDIRECT) {
-						struct in_addr gateway;
-						gateway.s_addr = icmp->un.gateway;
-						char gwstr[INET_ADDRSTRLEN];
-						if (inet_ntop(AF_INET, &gateway, gwstr, sizeof(gwstr)))
-							snprintf(extra, sizeof(extra), " (new nexthop: %s)", gwstr);
-					}
-					else if (icmp->type == ICMP_DEST_UNREACH && icmp->code == 4) { // Path MTU Discover ( Fragementation needed) TODO: Read more about mtu
-						unsigned mtu = ntohs(icmp->un.frag.mtu);
-						if (mtu)
-							snprintf(extra, sizeof(extra), " (mtu=%u)", mtu);
-					}
-				}
-				// ICMP error packet usually contains part of the original packet that caused the error.
-				uint16_t ourSeq = 0;
-				bool ours = parseSeqifOur((uint8_t *)buf, res, iphdr_len, conf->pid, &ourSeq);
-				if (ours){
-					if (conf->verbose)
-						printf("From %s icmp_seq=%u %s (type=%d code=%d)%s\n", from_addr, (unsigned)ourSeq, error_msg, icmp->type, icmp->code, extra);
-					else
-						printf("From %s %s\n", from_addr, error_msg);
-				}
-				// keep waiting: the error is not the echo reply we asked for
+
+			// send echo req 
+			ssize_t sent_bytes = sendto(fd, packet, icmp_len, 0, (struct sockaddr *)target_addr, sizeof(*target_addr));
+			if (sent_bytes < 0) {
+				perror("ft_ping: sendto");
+				// Don't count failed sends, just retry
 				continue;
 			}
+			
+			// Only increment sent count on first transmission (not retransmits)
+			if (retransmit == 0) {
+				logs.sent++;
+			}
+
+			// receive and parse. a raw socket also sees our own echo
+			// requests reflected back (e.g. on loopback), so keep reading
+			// until the matching reply or an icmp error for us arrives,
+			// or the socket times out (SO_RCVTIMEO).
+			while (!g_sig)
+			{
+				char	buf[2048]; //IOV max is 1024
+				struct sockaddr_in src; memset(&src, 0, sizeof(src));
+				struct msghdr rrecv; memset(&rrecv, 0, sizeof(rrecv));
+				struct iovec	iov; memset(&iov, 0, sizeof(iov));
+				iov.iov_base = buf; iov.iov_len = sizeof(buf);
+				rrecv.msg_iov = &iov; rrecv.msg_iovlen = 1; // number of elements in msg_iov
+				rrecv.msg_name = &src; rrecv.msg_namelen = sizeof(src);
+				ssize_t res = recvmsg(fd, &rrecv, 0);
+				if (res < (ssize_t)(sizeof(struct icmphdr) + sizeof(struct iphdr)))
+					break; // timeout or nothing usable: will retransmit or move to next seq
+				struct iphdr *ip = (struct iphdr *)buf;
+				int 	iphdr_len = ip->ihl * 4;
+				if (iphdr_len < (int)sizeof(struct iphdr) // bogus ip header length
+					|| res < iphdr_len + (ssize_t)sizeof(struct icmphdr)) // making sure ICMP header actually exists
+					continue; // keep waiting for our reply
+				// Finding the ICMP header
+				struct icmphdr *icmp = (struct icmphdr *)(buf + iphdr_len); // buf + iphdr_len = start of icmp hdr
+				if (icmp->type == ICMP_ECHOREPLY && ntohs(icmp->un.echo.id) == conf->pid) // check if it is echo reply and if it is our ping (pid)
+				{
+					double rtt_ms = 0.0;
+					// finding the timestamp in the ICMP PAYLOAD
+					// buf + IP header + icmp header -> start of payload ( which is timestamp)
+					/* ICMP payload: timespec.tv_sec
+					 		 timespec.tv_nsec
+					 		 other stuff */
+					if (buf + iphdr_len + (int)sizeof(struct icmphdr) + (int)sizeof(struct timespec) <= buf + res)
+					{
+						struct timespec sent_ts_reply;
+						memcpy(&sent_ts_reply, buf + iphdr_len + sizeof(struct icmphdr), sizeof(sent_ts_reply));
+						/*Calculating rtt*/
+						struct timespec now;
+						clock_gettime(CLOCK_MONOTONIC, &now);
+						long sec = now.tv_sec - sent_ts_reply.tv_sec;
+						long nsec = now.tv_nsec - sent_ts_reply.tv_nsec;
+						if (nsec < 0) // borrow from the seconds part
+						{
+							sec--;
+							nsec += 1000000000L;
+						}
+						rtt_ms = sec * 1000.0 + nsec / 1e6;
+						if (rtt_ms < 0.0)
+							rtt_ms = 0.0;
+					}
+					// Getting the source IP address
+					inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr)); //src.sin_addr contain binary addr IPv4
+					// Extract the sequence number
+					uint16_t rseq = ntohs(icmp->un.echo.sequence);
+					// Checking for duplicate 
+					bool duplicate = seen_seq[rseq];
+					seen_seq[rseq] = true;
+					if (duplicate)
+						duplicates++;
+					else
+						logs.rec++; // unique reply, counts toward packet loss stats
+					// rtt of duplicates still feeds min/max/avg/mdev (see note above)
+					logs.rtt_sum += rtt_ms;
+					rtt_sq_sum += rtt_ms * rtt_ms;
+					if (!have_rtt || rtt_ms < logs.rtt_min) logs.rtt_min = rtt_ms;
+					if (!have_rtt || rtt_ms > logs.rtt_max) logs.rtt_max = rtt_ms;
+					have_rtt = true;
+					// print the output here if the quiet flag is NOT true;
+					print_reply(conf, from_addr, rseq, res - iphdr_len,
+						ip->ttl, rtt_ms, duplicate);
+					got_reply = true; // got our reply for this sequence
+					break; // break out of receive loop
+				}
+				if (icmp->type == ICMP_ECHO)
+					continue; // our own echoed-back echo request, not a reply
+				if (icmp->type != ICMP_ECHOREPLY){ // to show icmp error code for -v
+					inet_ntop(AF_INET, &src.sin_addr, from_addr, sizeof(from_addr));
+					const char *error_msg = icmp_desc(icmp->type, icmp->code);
+					// to handle verbose information
+					char extra[128]; extra[0] = '\0';
+					if (conf->verbose)
+					{
+						if (icmp->type == ICMP_REDIRECT) {
+							struct in_addr gateway;
+							gateway.s_addr = icmp->un.gateway;
+							char gwstr[INET_ADDRSTRLEN];
+							if (inet_ntop(AF_INET, &gateway, gwstr, sizeof(gwstr)))
+								snprintf(extra, sizeof(extra), " (new nexthop: %s)", gwstr);
+						}
+						else if (icmp->type == ICMP_DEST_UNREACH && icmp->code == 4) { // Path MTU Discover ( Fragmentation needed) TODO: Read more about mtu
+							unsigned mtu = ntohs(icmp->un.frag.mtu);
+							if (mtu)
+								snprintf(extra, sizeof(extra), " (mtu=%u)", mtu);
+						}
+					}
+					// ICMP error packet usually contains part of the original packet that caused the error.
+					uint16_t ourSeq = 0;
+					bool ours = parseSeqifOur((uint8_t *)buf, res, iphdr_len, conf->pid, &ourSeq);
+					if (ours){
+						if (conf->verbose)
+							printf("From %s icmp_seq=%u %s (type=%d code=%d)%s\n", from_addr, (unsigned)ourSeq, error_msg, icmp->type, icmp->code, extra);
+						else
+							printf("From %s %s\n", from_addr, error_msg);
+					}
+					// keep waiting: the error is not the echo reply we asked for
+					continue;
+				}
+			} // end receive loop
+
+			if (!got_reply) {
+				retransmit++;
+				if (retransmit <= max_retransmit && !g_sig) {
+					// Timeout occurred - will retransmit same sequence
+					if (conf->verbose) {
+						fprintf(stderr, "ft_ping: timeout, retransmitting seq=%u (attempt %d/%d)\n", 
+							seq, retransmit, max_retransmit);
+					}
+				}
+			}
+		} // end retransmit loop
+
+		// If we exhausted retransmits without reply, that's a lost packet
+		if (!got_reply && retransmit > max_retransmit) {
+			if (conf->verbose) {
+				fprintf(stderr, "ft_ping: seq=%u lost after %d retransmits\n", seq, max_retransmit);
+			}
 		}
-		if (conf->count >= 0 && logs.sent >= conf->count)
-			break;
-	}
+
+		seq++; // move to next sequence number
+
+		// Sleep ~1 second before next ping (standard ping interval)
+		// Only sleep if not exiting and not the last packet
+		if (!g_sig && (conf->count <= 0 || logs.sent < (unsigned)conf->count)) {
+			struct timespec sleep_ts = {1, 0}; // 1 second
+			nanosleep(&sleep_ts, NULL);
+		}
+	} // end main while loop
+
 	clock_gettime(CLOCK_MONOTONIC, &logs.end_time);
 	print_summary(conf, &logs, rtt_sq_sum, duplicates);
 	close(fd);

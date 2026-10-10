@@ -5,7 +5,7 @@ int  ipv4_icmp_socket(t_config *conf)
 	int fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	if (fd < 0)
 	{
-		// print ping's error log
+		perror("ft_ping: socket");
 		return -1;
 	}
 

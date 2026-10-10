@@ -52,7 +52,7 @@ t_config	parseInput(int argc, char **argv);
 // dns.c
 int	resolveDNS(t_config *conf);
 //icmp.c
-size_t	buildEchoPacket(t_config *conf, uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time);
+size_t	buildEchoPacket(uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time);
 //ping loop
 int  ipv4_icmp_socket(t_config *conf);
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str);

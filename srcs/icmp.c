@@ -35,7 +35,7 @@ static uint16_t calculateChecksum(const void *data, size_t l)
 }
 
 // TODO: calculate time taken to send a packet.
-size_t	buildEchoPacket(t_config *conf, uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time)
+size_t	buildEchoPacket(uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid, struct timespec *st_time)
 { 
 	size_t icmp_len = sizeof(struct icmphdr) + packetSize;
 	if (packetSize < 0 || (size_t)packetSize > 65535)
