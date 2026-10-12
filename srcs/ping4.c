@@ -178,7 +178,7 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 	while (!g_sig)
 	{
 		// Check count limit BEFORE sending (use sent count, not received)
-		if (conf->count > 0 && logs.sent >= (unsigned)conf->count)
+		if (conf->count > 0 && logs.sent >= conf->count)
 			break;
 
 		// Retransmit state for current sequence
@@ -347,7 +347,7 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 
 		// Sleep ~1 second before next ping (standard ping interval)
 		// Only sleep if not exiting and not the last packet
-		if (!g_sig && (conf->count <= 0 || logs.sent < (unsigned)conf->count)) {
+		if (!g_sig && (conf->count <= 0 || logs.sent < conf->count)) {
 			struct timespec sleep_ts = {1, 0}; // 1 second
 			nanosleep(&sleep_ts, NULL);
 		}
