@@ -60,3 +60,46 @@ size_t	buildEchoPacket(uint8_t *packet, int packetSize, uint16_t seq, uint16_t p
 	hdr->checksum = calculateChecksum(packet, icmp_len);
 	return icmp_len;
 }
+
+static uint16_t icmp6_checksum(const struct in6_addr *src, const struct in6_addr *dst, const uint8_t *icmp, size_t icmp_len)
+{
+
+}
+
+size_t	buildEchoV6Packet(uint8_t *packetBuf, size_t packet_len, uint16_t pid, uint16_t seq, size_t packet_size, const struct timespec *send_ts, const t_config *conf, const struct in6_addr *src, const struct in_6_addr *dst)
+{
+	size_t icmp_len = sizeof(struct icmp6_hdr) + packet_size;
+	if (packet_len < icmp_len) return 0;
+
+	struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)packetBuf;
+	icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
+	icmp6->icmp6_code = 0;
+	icmp6->icmp6_cksum = 0;
+	icmp6->icmp6_id = htons(pid);
+	icmp6->icmp6_seq = htons(seq);
+
+	uint8_t *payload = buf + sizeof(struct icmp6_hdr);
+	size_t ts_len = sizeof(struct timesepc);
+	if (packet_len >= ts_len && send_ts){
+		memcpy(payload, send_ts, ts_len);
+		size_t rem = packet_len - ts_len;
+		if (conf && conf->patter_len > 0){
+			for (size_t i = 0; i < rem; ++i)
+				payload[ts_len + i] = conf->pattern[i % conf->pattern_len];
+		} else {
+			memset(payload + ts_len, 0x42, rem);	
+		}
+	} else {
+		
+		if (conf && conf->patter_len > 0){
+			for (size_t i = 0; i < packet_len; ++i)
+				payload[i] = conf->pattern[i % conf->pattern_len];
+		} else {
+		
+			memset(payload + ts_len, 0x42, rem);	
+		}
+	}
+
+	icmp6->icmp6_cksum = icmp6_checksum(src, dst, packetBuf, icmp_len);
+	return icmp_len
+}

@@ -5,7 +5,7 @@ int  ipv4_icmp_socket(t_config *conf)
 	int fd = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP);
 	if (fd < 0)
 	{
-		perror("ft_ping: socket");
+		perror("ft_ping: socket ipv4");
 		return -1;
 	}
 
@@ -16,6 +16,29 @@ int  ipv4_icmp_socket(t_config *conf)
 			perror("ft_ping: setsockopt(IP_TTL)");
 	}
 
+	struct timeval tv;
+	tv.tv_sec = conf->timeout_ms / 1000;
+	tv.tv_usec = (conf->timeout_ms % 1000) * 1000;
+	if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
+		perror("ft_ping: setsockopt(SO_RCVTIMEO)");
+	return fd;
+}
+
+int 	ipv6_icmp_socket(t_config *conf)
+{
+	int	fd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMP);
+	if (fd < 0)
+	{
+		perror("ft_ping: socket ipv6");	
+		return -1;
+	}
+
+	if (conf->ttl > 0)
+	{
+		int ttl = conf->ttl;
+		if (setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
+			perror("ft_ping: setsocket(IP_TTL)");		
+	}
 	struct timeval tv;
 	tv.tv_sec = conf->timeout_ms / 1000;
 	tv.tv_usec = (conf->timeout_ms % 1000) * 1000;

@@ -22,6 +22,7 @@ int 	main(int argc, char **argv)
 
 	if(conf.ipv6){
 		// handle ipv6 case here.
+		ft_pingIpv6(&conf, &conf.target_addr, conf.ip_str);
 	}
 	else {
 		// handle ipv4 here

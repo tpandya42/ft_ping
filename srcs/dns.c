@@ -39,3 +39,8 @@ int	resolveDNS(t_config *conf)
 	freeaddrinfo(result);
 	return (0);
 }
+
+int 	resolveIPv6DNS( )
+{
+
+}
