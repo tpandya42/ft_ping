@@ -155,7 +155,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 
 		struct timespec send_ts;
 		clock_gettime(CLOCK_MONOTONIC, &send_ts);
-		size_t icmp_len = buildEchoV6Packet(packet, sizeof(packet), seq, conf->pid, &send_ts, &src, dst, conf->pattern);
+		size_t icmp_len = buildEchoV6Packet(packet, conf->packet_size, seq, conf->pid, &send_ts, &src, dst, conf->pattern);
 		if (icmp_len == 0)
 		{
 			fprintf(stderr, "ft_ping: failed to build icmp packet\n");
