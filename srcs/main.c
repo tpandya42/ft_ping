@@ -14,21 +14,21 @@ int 	main(int argc, char **argv)
 	t_config	conf;
 	conf = parseInput(argc, argv);
 
+	int ret = 0;
 	if(conf.ipv6){
-		// handle ipv6 case here.
 		if (resolveIPv6DNS(&conf) != 0)
 			return (1);
 		printf("Hostname's ip: %s\n", conf.ip6_str);
-		ft_pingIpv6(&conf, &conf.target_addr6, conf.ip6_str);	
+		ret = ft_pingIpv6(&conf, &conf.target_addr6, conf.ip6_str);	
 	}
 	else {
-		// handle ipv4 here
-		// Things to do -> resolve dns, send ICMP packet, recieve, print
 		if (resolveDNS(&conf) != 0)
 			return (1);
 		printf("Hostname's ip: %s\n", conf.ip_str);
-		ft_pingIpv4(&conf, &conf.target_addr, conf.ip_str);	
+		ret = ft_pingIpv4(&conf, &conf.target_addr, conf.ip_str);	
 	}
 
-	return (0);
+	if (ret < 0)
+		return (1);
+	return (ret);
 }

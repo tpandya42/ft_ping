@@ -20,7 +20,7 @@ all: $(NAME)
 $(NAME): $(OBJ)
 	@$(CC) $(CFLAGS) $(OBJ) -o $(NAME) -lm
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(INC_DIR)/ft_ping.h
 	@mkdir -p $(OBJ_DIR)
 	@$(CC) $(CFLAGS) $(INC) -c $< -o $@
 

@@ -1,28 +1,94 @@
 #include "ft_ping.h"
 #include <stdlib.h>
+#include <getopt.h>
+
+static void print_usage(void)
+{
+	printf("Usage: ft_ping [OPTION...] HOST ...\n");
+	printf("Send ICMP ECHO_REQUEST packets to network hosts.\n\n");
+	printf("  -c, --count=NUMBER     stop after sending NUMBER packets\n");
+	printf("  -f, --flood            flood ping (root only)\n");
+	printf("  -i, --interval=NUMBER  wait NUMBER seconds between sending each packet\n");
+	printf("  -l, --preload=NUMBER   send NUMBER packets as fast as possible before\n");
+	printf("                           falling into normal mode of behavior\n");
+	printf("  -n, --numeric          do not resolve host addresses\n");
+	printf("  -q, --quiet            quiet output\n");
+	printf("  -r, --ignore-routing   send directly to a host on an attached network\n");
+	printf("  -s, --size=NUMBER      send NUMBER data octets\n");
+	printf("  -t, --ttl=N            set time to live (IP TTL) to N\n");
+	printf("  -T, --tos=NUM          set type of service (TOS) to NUM\n");
+	printf("      --ip-timestamp=FLAG  IP timestamp of type FLAG, which is one of\n");
+	printf("                           \"tsonly\" or \"tsaddr\"\n");
+	printf("  -v, --verbose          verbose output\n");
+	printf("  -w, --timeout=NUMBER   stop after NUMBER seconds\n");
+	printf("  -W, --linger=NUMBER    number of seconds to wait for response\n");
+	printf("  -p, --pattern=PATTERN  fill ICMP packet with given pattern (hex)\n");
+	printf("  -6                     use IPv6\n");
+	printf("  -?, --help             give this help list\n");
+	printf("      --usage            give a short usage message\n");
+}
+
+static void print_short_usage(void)
+{
+	printf("Usage: ft_ping [-c COUNT] [-f] [-i INTERVAL] [-l PRELOAD] [-n] [-q] [-r] [-s SIZE]\n");
+	printf("                [-t TTL] [-T TOS] [--ip-timestamp=FLAG] [-v] [-w TIMEOUT] [-W LINGER]\n");
+	printf("                [-p PATTERN] [-6] [-?] HOST ...\n");
+}
 
 t_config	parseInput(int argc,char **argv)
 {
 	t_config 	conf;
 	memset(&conf, 0, sizeof(conf));
-	conf.count = -1; // by default it is unlimited
-	conf.ttl = 64; // default ttl
+	conf.count = -1;
+	conf.ttl = 64;
 	conf.verbose = false;
 	conf.quiet = false;
 	conf.numeric = false;
-	conf.timeout_ms = 1000; //1s default -W
+	conf.timeout_ms = 1000;
 	conf.packet_size = 56;
 	conf.ipv6 = false;
 	conf.pid = (uint16_t)getpid();
+	conf.pattern = 0x42;
+	conf.dontroute = false;
+	conf.deadline = 0;
+	conf.tos = -1;
+	conf.ip_ts = 0;
+	conf.ip_ts_type = 0;
 
-	int		opt;
-	while ((opt = getopt(argc, argv, "v?6c:t:W:s:qn")) != -1)
+	static struct option long_options[] = {
+		{"count", required_argument, 0, 'c'},
+		{"flood", no_argument, 0, 'f'},
+		{"interval", required_argument, 0, 'i'},
+		{"preload", required_argument, 0, 'l'},
+		{"numeric", no_argument, 0, 'n'},
+		{"quiet", no_argument, 0, 'q'},
+		{"ignore-routing", no_argument, 0, 'r'},
+		{"size", required_argument, 0, 's'},
+		{"ttl", required_argument, 0, 't'},
+		{"tos", required_argument, 0, 'T'},
+		{"ip-timestamp", required_argument, 0, 1000},
+		{"verbose", no_argument, 0, 'v'},
+		{"timeout", required_argument, 0, 'w'},
+		{"linger", required_argument, 0, 'W'},
+		{"pattern", required_argument, 0, 'p'},
+		{"help", no_argument, 0, '?'},
+		{"usage", no_argument, 0, 1001},
+		{0, 0, 0, 0}
+	};
+
+	int opt;
+	while ((opt = getopt_long(argc, argv, "v?6c:t:W:w:s:qnfp:rT:", long_options, NULL)) != -1)
 	{
 		if (opt == 'v')
 			conf.verbose = true;
 		else if (opt == '?')
 		{
-			// print help text;
+			print_usage();
+			exit(0);
+		}
+		else if (opt == 1001)
+		{
+			print_short_usage();
 			exit(0);
 		}
 		else if (opt == '6') {
@@ -33,24 +99,39 @@ t_config	parseInput(int argc,char **argv)
 		else if (opt == 'q')
 			conf.quiet = true;
 		else if (opt == 'c') {
-			// parse count
 			conf.count = atoi(optarg);
 		}
-		
-		else if (opt == 'T'){
-			// do something	
+		else if (opt == 'T') {
+			conf.tos = atoi(optarg);
 		}
-		else if (opt == 't'){
-			// parse time to live
+		else if (opt == 't') {
 			conf.ttl = atoi(optarg);
 		}
-		else if (opt == 'W'){
-			// parse timout in ms
-			conf.timeout_ms = atoi(optarg);
+		else if (opt == 'W') {
+			conf.timeout_ms = atoi(optarg) * 1000;
 		}
-		else if (opt == 's'){
-			// parse packet size
+		else if (opt == 'w') {
+			conf.deadline = atoi(optarg);
+		}
+		else if (opt == 's') {
 			conf.packet_size = atoi(optarg);
+		}
+		else if (opt == 'p') {
+			conf.pattern = (uint8_t)strtol(optarg, NULL, 16);
+		}
+		else if (opt == 'r') {
+			conf.dontroute = true;
+		}
+		else if (opt == 1000) {
+			if (strcmp(optarg, "tsonly") == 0)
+				conf.ip_ts_type = 1;
+			else if (strcmp(optarg, "tsaddr") == 0)
+				conf.ip_ts_type = 3;
+			else {
+				fprintf(stderr, "ft_ping: invalid timestamp flag: %s\n", optarg);
+				exit(64);
+			}
+			conf.ip_ts = 1;
 		}
 		else {
 			fprintf(stderr, "ft_ping: unrecognized option '%s'\n", argv[optind - 1]);
