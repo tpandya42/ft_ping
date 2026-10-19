@@ -40,7 +40,43 @@ int	resolveDNS(t_config *conf)
 	return (0);
 }
 
-int 	resolveIPv6DNS( )
+int	resolveIPv6DNS(t_config *conf)
 {
+	struct addrinfo hints;
+	struct addrinfo	*result;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_flags = AI_CANONNAME;
+	
+	if (getaddrinfo(conf->hostname, NULL, &hints, &result) != 0)
+	{
+		fprintf(stderr, "ft_ping: unknown host %s\n", conf->hostname);
+		return (-1);
+	}
 
+	struct addrinfo *rp = NULL;
+	for (rp = result; rp != NULL; rp = rp->ai_next)
+	{
+		if (rp->ai_family == AF_INET6)
+			break;
+	}
+	if (!rp)
+	{
+		fprintf(stderr, "ft_ping: no IPv6 address for %s\n", conf->hostname);
+		freeaddrinfo(result);
+		return (-1);
+	}
+
+	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)rp->ai_addr;
+	conf->target_addr6 = *addr;
+	
+	const char *ptr = inet_ntop(AF_INET6, &addr->sin6_addr, conf->ip6_str, sizeof(conf->ip6_str));
+	if (!ptr)
+	{
+		// fallback to hostname in case conversion fails
+		strncpy(conf->ip6_str, conf->hostname, sizeof(conf->ip6_str));	
+	}	
+	freeaddrinfo(result);
+	return (0);
 }

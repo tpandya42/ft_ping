@@ -11,27 +11,60 @@
  * Step 3 is to fold carry bits 
  * Step 4 is to do One's complement*/ 
 
-static uint16_t calculateChecksum(const void *data, size_t l)
+static uint32_t checksumSum(const void *data, size_t len, uint32_t sum)
 {
 	const uint16_t *words = (const uint16_t *)data;
-	uint32_t sum = 0;
-	while (l > 1)
+	while (len > 1)
 	{
 		sum += *words++;
-		l -=2;
+		len -= 2;
 	}
 	// odd length handling
-	if (l == 1) {
+	if (len == 1) {
 		uint16_t odd_byte = 0;
 		// copying single remaining byte into low-address byte of odd_byte
 		*((uint8_t *)&odd_byte) = *(const uint8_t *)words;
 		sum += odd_byte;
 	}
-	// folding 32bit sum into 16bits
-	while (sum >> 16) {
+	return sum;
+}
+
+static uint16_t checksumFold(uint32_t sum)
+{
+	while (sum >> 16)
 		sum = (sum & 0xFFFF) + (sum >> 16);
-	}
 	return (uint16_t)(~sum);
+}
+
+uint16_t calculateChecksum(const void *data, size_t l)
+{
+	return checksumFold(checksumSum(data, l, 0));
+}
+
+/* IPv6 pseudo-header for ICMPv6 checksum (RFC 2460 section 8.1):
+ *   src (16) + dst (16) + length (4) + zero[3] (3) + next_header (1) = 40 bytes
+ * Note: Linux kernel automatically computes/overwrites the ICMPv6 checksum
+ * for raw ICMPv6 sockets (rawv6_init_sk sets checksum=1, offset=2).
+ * We compute it anyway so the packet is correct on its own. */
+static uint16_t icmp6_checksum(const struct in6_addr *src, const struct in6_addr *dst,
+                               const uint8_t *icmp, size_t icmp_len)
+{
+	struct {
+		struct in6_addr src;
+		struct in6_addr dst;
+		uint32_t        len;
+		uint8_t         zero[3];
+		uint8_t         next;
+	} pseudo = {
+		.src = *src,
+		.dst = *dst,
+		.len = htonl(icmp_len),
+		.zero = {0, 0, 0},
+		.next = IPPROTO_ICMPV6
+	};
+	uint32_t sum = checksumSum(&pseudo, sizeof(pseudo), 0);
+	sum = checksumSum(icmp, icmp_len, sum);
+	return checksumFold(sum);
 }
 
 // TODO: calculate time taken to send a packet.
@@ -61,45 +94,31 @@ size_t	buildEchoPacket(uint8_t *packet, int packetSize, uint16_t seq, uint16_t p
 	return icmp_len;
 }
 
-static uint16_t icmp6_checksum(const struct in6_addr *src, const struct in6_addr *dst, const uint8_t *icmp, size_t icmp_len)
-{
+size_t	buildEchoV6Packet(uint8_t *packet, int packetSize, uint16_t seq, uint16_t pid,
+                          struct timespec *st_time, const struct in6_addr *src, const struct in6_addr *dst)
+{ 
+	size_t icmp_len = sizeof(struct icmp6_hdr) + packetSize;
+	if (packetSize < 0 || (size_t)packetSize > 65535)
+		return 0;
+	struct icmp6_hdr *hdr = (struct icmp6_hdr *)packet;
+	hdr->icmp6_type = ICMP6_ECHO_REQUEST; // 128
+	hdr->icmp6_code = 0;
+	hdr->icmp6_cksum = 0;
+	hdr->icmp6_id = htons(pid);
+	hdr->icmp6_seq = htons(seq);
 
-}
-
-size_t	buildEchoV6Packet(uint8_t *packetBuf, size_t packet_len, uint16_t pid, uint16_t seq, size_t packet_size, const struct timespec *send_ts, const t_config *conf, const struct in6_addr *src, const struct in_6_addr *dst)
-{
-	size_t icmp_len = sizeof(struct icmp6_hdr) + packet_size;
-	if (packet_len < icmp_len) return 0;
-
-	struct icmp6_hdr *icmp6 = (struct icmp6_hdr *)packetBuf;
-	icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
-	icmp6->icmp6_code = 0;
-	icmp6->icmp6_cksum = 0;
-	icmp6->icmp6_id = htons(pid);
-	icmp6->icmp6_seq = htons(seq);
-
-	uint8_t *payload = buf + sizeof(struct icmp6_hdr);
-	size_t ts_len = sizeof(struct timesepc);
-	if (packet_len >= ts_len && send_ts){
-		memcpy(payload, send_ts, ts_len);
-		size_t rem = packet_len - ts_len;
-		if (conf && conf->patter_len > 0){
-			for (size_t i = 0; i < rem; ++i)
-				payload[ts_len + i] = conf->pattern[i % conf->pattern_len];
-		} else {
-			memset(payload + ts_len, 0x42, rem);	
-		}
-	} else {
-		
-		if (conf && conf->patter_len > 0){
-			for (size_t i = 0; i < packet_len; ++i)
-				payload[i] = conf->pattern[i % conf->pattern_len];
-		} else {
-		
-			memset(payload + ts_len, 0x42, rem);	
-		}
+	uint8_t *payload = packet + sizeof(struct icmp6_hdr);
+	if (st_time && packetSize >= (int)sizeof(struct timespec))
+	{
+		memcpy(payload, st_time, sizeof(struct timespec));
+		memset(payload + sizeof(struct timespec), 0x42, packetSize - sizeof(struct timespec));
 	}
-
-	icmp6->icmp6_cksum = icmp6_checksum(src, dst, packetBuf, icmp_len);
-	return icmp_len
+	else
+	{
+		memset(payload, 0x42, packetSize);
+	}
+	// Linux kernel will recompute/overwrite this checksum for raw ICMPv6 sockets.
+	// We compute it correctly so the packet is standalone-valid.
+	hdr->icmp6_cksum = icmp6_checksum(src, dst, packet, icmp_len);
+	return icmp_len;
 }
