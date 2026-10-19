@@ -9,7 +9,6 @@ static void handle_sigint(int sig)
 {
 	(void)sig;
 	// no i/o here (not async-signal-safe): the empty line before the
-	// statistics is printed by print_summary, matching iputils
 	g_sig = 1;
 }
 
@@ -66,8 +65,6 @@ static bool	parseSeqifOur6(uint8_t *buf, ssize_t res, uint16_t pid, uint16_t *ou
 	}
 	return false;
 }
-
-/* -------------------- log output (inetutils-2.0 style) -------------------- */
 
 static void	print_ping_header(t_config *conf, const char *ip_str)
 {
