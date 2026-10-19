@@ -20,11 +20,9 @@ static const char *icmp6_desc(uint8_t type, uint8_t code)
 			{
 				case ICMP6_DST_UNREACH_NOROUTE: return "Destination Unreachable: No route to destination";
 				case ICMP6_DST_UNREACH_ADMIN:   return "Destination Unreachable: Administratively prohibited";
-				case ICMP6_DST_UNREACH_BEYOND:  return "Destination Unreachable: Beyond scope of source address";
+				case ICMP6_DST_UNREACH_BEYONDSCOPE:  return "Destination Unreachable: Beyond scope of source address";
 				case ICMP6_DST_UNREACH_ADDR:    return "Destination Unreachable: Address unreachable";
 				case ICMP6_DST_UNREACH_NOPORT:  return "Destination Unreachable: Port unreachable";
-				case ICMP6_DST_UNREACH_FAIL:    return "Destination Unreachable: Source address failed ingress/egress policy";
-				case ICMP6_DST_UNREACH_REJECT:  return "Destination Unreachable: Reject route to destination";
 				default: return "Destination Unreachable";
 			}
 		case ICMP6_PACKET_TOO_BIG:
@@ -143,7 +141,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 
 	while (!g_sig)
 	{
-		if (conf->count > 0 && logs.sent >= (unsigned)conf->count)
+		if (conf->count > 0 && logs.sent >= conf->count)
 			break;
 
 		if (conf->deadline > 0)
@@ -274,7 +272,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 
 		seq++;
 
-		if (!g_sig && (conf->count <= 0 || logs.sent < (unsigned)conf->count))
+		if (!g_sig && (conf->count <= 0 || logs.sent < conf->count))
 		{
 			struct timespec sleep_ts = {1, 0};
 			nanosleep(&sleep_ts, NULL);
