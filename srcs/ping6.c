@@ -172,7 +172,6 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 		}
 		logs.sent++;
 
-		bool got_reply = false;
 		while (!g_sig)
 		{
 			char	buf[2048];
@@ -237,7 +236,6 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 				have_rtt = true;
 				print_reply(conf, from_addr, rseq, res,
 					hoplimit, rtt_ms, duplicate);
-				got_reply = true;
 				break;
 			}
 			if (icmp6->icmp6_type == ICMP6_ECHO_REQUEST)
@@ -253,7 +251,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 					printf("%zu bytes from %s: %s\n", res, from_addr, error_msg);
 					if (conf->verbose && ours)
 					{
-						uint8_t *outer_icmp6 = buf;
+						uint8_t *outer_icmp6 = (uint8_t *)buf;
 						uint8_t *inner_ip = outer_icmp6 + sizeof(struct icmp6_hdr);
 						if (inner_ip + sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr) <= (uint8_t *)buf + res)
 						{

@@ -311,7 +311,6 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 		}
 		logs.sent++;
 
-		bool got_reply = false;
 		while (!g_sig)
 		{
 			char	buf[2048];
@@ -367,7 +366,6 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 					ip->ttl, rtt_ms, duplicate);
 				if (conf->ip_ts)
 					print_ip_opt(ip, iphdr_len);
-				got_reply = true;
 				break;
 			}
 			if (icmp->type == ICMP_ECHO)
@@ -383,7 +381,7 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 					printf("%zu bytes from %s: %s\n", res - iphdr_len, from_addr, error_msg);
 					if (conf->verbose && ours)
 					{
-						uint8_t *outer_icmp = buf + iphdr_len;
+						uint8_t *outer_icmp = (uint8_t *)buf + iphdr_len;
 						uint8_t *inner_ip = outer_icmp + sizeof(struct icmphdr);
 						if (inner_ip + sizeof(struct iphdr) + sizeof(struct icmphdr) <= (uint8_t *)buf + res)
 						{
