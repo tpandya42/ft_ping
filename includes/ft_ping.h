@@ -52,6 +52,7 @@ typedef struct s_logs {
 	double rtt_mdev; 
 } t_logs;
 
+extern volatile sig_atomic_t g_sig;
 
 // parsing.c
 t_config	parseInput(int argc, char **argv);

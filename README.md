@@ -7,7 +7,7 @@ built for the 42 Berlin curriculum with inetutils-2.0 as the behavioral referenc
 
 | Category | Features |
 |----------|----------|
-| **Mandatory** | IPv4 echo, `-v` verbose, `-?` help, FQDN input |
+| **Mandatory** | IPv4 echo, `-v` verbose, `-?` / `-h` help, FQDN input |
 | **Bonus** | `-w` deadline, `-W` timeout, `-p` pattern, `-r` ignore-routing, `-s` size, `-T` TOS, `--ip-timestamp`, `--ttl`, `-q` quiet, `-n` numeric |
 | **Extra** | IPv6 (`-6`), long options (`--help`, `--usage`, `--ttl`, `--ip-timestamp`) |
 
@@ -57,6 +57,7 @@ sudo ./ft_ping --ip-timestamp=tsonly -c 2 127.0.0.1  # timestamp option
 
 # Help
 ./ft_ping -?
+./ft_ping -h
 ./ft_ping --help
 ./ft_ping --usage
 ```
@@ -66,7 +67,7 @@ sudo ./ft_ping --ip-timestamp=tsonly -c 2 127.0.0.1  # timestamp option
 | Short | Long | Arg | Description |
 |-------|------|-----|-------------|
 | `-v` | `--verbose` | — | Verbose output |
-| `-?` | `--help` | — | Full usage |
+| `-?`, `-h` | `--help` | — | Full usage |
 | | `--usage` | — | Short usage |
 | `-6` | — | — | IPv6 mode |
 | `-c` | `--count` | NUM | Stop after NUM packets |

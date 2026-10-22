@@ -44,7 +44,7 @@ CFLAGS="-Wall -Werror -Wextra -g" make re
 |------|---------|----------|
 | Basic IPv4 | `sudo ./ft_ping -c 3 8.8.8.8` | 3 replies, summary |
 | Verbose | `sudo ./ft_ping -v -c 2 8.8.8.8` | Header with `id 0x...` |
-| Help | `./ft_ping -?` | Usage text, exit 0 |
+| Help | `./ft_ping -?` / `-h` | Usage text, exit 0 |
 | Missing host | `./ft_ping` | Error + hint, exit 64 |
 | Unknown option | `./ft_ping -z` | Error + hint, exit 64 |
 
@@ -93,7 +93,7 @@ CFLAGS="-Wall -Werror -Wextra -g" make re
 |-------------|------|---------------|
 | Mandatory: IPv4 echo | `-c 3 8.8.8.8` | Replies + summary |
 | Mandatory: `-v` | `-v -c 2` | Verbose header + error detail |
-| Mandatory: `-?` | `-?` | Usage text, exit 0 |
+| Mandatory: `-?` | `-?` / `-h` | Usage text, exit 0 |
 | Mandatory: FQDN input | `google.com` | Resolves + pings |
 | Output indent | Compare with `inetutils-2.0 ping` | Identical (except RTT/rDNS) |
 | RTT line exempt | Summary includes RTT line | Allowed to differ |

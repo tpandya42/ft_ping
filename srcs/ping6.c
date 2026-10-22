@@ -3,8 +3,6 @@
 #include <time.h>
 #include <math.h>
 
-static volatile sig_atomic_t g_sig = 0; 
-
 static void handle_sigint(int sig)
 {
 	(void)sig;

@@ -5,7 +5,7 @@
 | Short | Long | Argument | Description | Default |
 |-------|------|----------|-------------|---------|
 | `-v` | `--verbose` | — | Verbose output (ICMP errors, ID in header) | off |
-| `-?` | `--help` | — | Print full usage and exit | — |
+| `-?`, `-h` | `--help` | — | Print full usage and exit | — |
 | | `--usage` | — | Print short usage and exit | — |
 | `-6` | — | — | Use IPv6 | off |
 | `-c` | `--count` | NUMBER | Stop after sending NUMBER packets | unlimited |
@@ -28,7 +28,7 @@
 | Option | Description | Implemented |
 |--------|-------------|-------------|
 | `-v` | Verbose | Yes |
-| `-?` | Help | Yes |
+| `-?` / `-h` | Help | Yes |
 
 ## Bonus Options (Subject List)
 
@@ -62,9 +62,9 @@
 - **Detail line**: on our errors, adds `ICMP: type N, code N, size N, id 0xXXXX, seq 0xXXXX`.
 - **Duplicates**: `(DUP!)` printed on every duplicate (also without `-v`).
 
-### `-?`, `--help`, `--usage`
+### `-?`, `-h`, `--help`, `--usage`
 
-- `-?` / `--help`: full usage text (stdout, exit 0).
+- `-?` / `-h` / `--help`: full usage text (stdout, exit 0).
 - `--usage`: one-line short usage (stdout, exit 0).
 - Unknown option → error message + `"Try 'ft_ping -?' for more information."` (stderr, exit 64).
 

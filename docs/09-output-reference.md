@@ -69,7 +69,7 @@ printf("%zu bytes from %s: %s\n", bytes, from_addr, error_msg);
 **Representative example:**
 
 ```
-56 bytes from 192.0.2.1: Time to live exceeded
+36 bytes from 192.0.2.1: Time to live exceeded
 ```
 
 ### ICMP Error (Verbose + Our Packet) — Extra Detail Line
@@ -82,7 +82,7 @@ printf("ICMP: type %u, code %u, size %u, id 0x%04x, seq 0x%04x\n",
 **Representative example:**
 
 ```
-56 bytes from 192.0.2.1: Time to live exceeded
+36 bytes from 192.0.2.1: Time to live exceeded
 ICMP: type 8, code 0, size 64, id 0x1234, seq 0x0005
 ```
 
@@ -96,7 +96,7 @@ ICMP: type 8, code 0, size 64, id 0x1234, seq 0x0005
 Only the first line is printed (no detail line):
 
 ```
-56 bytes from 192.0.2.1: Destination Host Unreachable
+36 bytes from 192.0.2.1: Destination Host Unreachable
 ```
 
 ### Summary (End of Run or SIGINT)
@@ -155,8 +155,8 @@ the inetutils label `round-trip min/avg/max/stddev` for consistency.
 | Header (-v) | `PING host (ip): 56 data bytes, id 0x1234 = 4660` | Same | Match |
 | Reply | `64 bytes from ip: icmp_seq=0 ttl=117 time=12.345 ms` | Same | Match |
 | Reply (DUP) | `64 bytes from ip: icmp_seq=5 ttl=117 time=13.102 ms (DUP!)` | Same | Match |
-| Error (no -v) | `56 bytes from ip: Time to live exceeded` | Same | Match |
-| Error (-v) | `56 bytes from ip: Time to live exceeded` + detail line | Same | Match |
+| Error (no -v) | `36 bytes from ip: Time to live exceeded` | Same | Match |
+| Error (-v) | `36 bytes from ip: Time to live exceeded` + detail line | Same | Match |
 | Summary | `--- host ping statistics ---`<br>`4 transmitted, 4 received, 0% loss` | Same | Match |
 | Summary (dups) | `+1 duplicates, ` inline | Same | Match |
 | Summary (time) | **No** `time Xms` | **No** `time Xms` | Match |

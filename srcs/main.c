@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+volatile sig_atomic_t g_sig = 0;
 
 int 	main(int argc, char **argv)
 {

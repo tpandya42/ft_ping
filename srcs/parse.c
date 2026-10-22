@@ -20,7 +20,7 @@ static void print_usage(void)
 	printf("  -W, --linger=NUMBER    number of seconds to wait for response\n");
 	printf("  -p, --pattern=PATTERN  fill ICMP packet with given pattern (hex)\n");
 	printf("  -6                     use IPv6\n");
-	printf("  -?, --help             give this help list\n");
+	printf("  -?, -h, --help         give this help list\n");
 	printf("      --usage            give a short usage message\n");
 }
 
@@ -28,7 +28,7 @@ static void print_short_usage(void)
 {
 	printf("Usage: ft_ping [-c COUNT] [-n] [-q] [-r] [-s SIZE]\n");
 	printf("                [-t TTL] [-T TOS] [--ip-timestamp=FLAG] [-v] [-w TIMEOUT] [-W LINGER]\n");
-	printf("                [-p PATTERN] [-6] [-?] HOST ...\n");
+	printf("                [-p PATTERN] [-6] [-?] [-h] HOST ...\n");
 }
 
 t_config	parseInput(int argc,char **argv)
@@ -80,7 +80,7 @@ t_config	parseInput(int argc,char **argv)
 
 	int opt;
 	opterr = 0;
-	while ((opt = getopt_long(argc, argv, ":v6c:t:W:w:s:qnp:rT:", long_options, NULL)) != -1)
+	while ((opt = getopt_long(argc, argv, ":v6hc:t:W:w:s:qnp:rT:", long_options, NULL)) != -1)
 	{
 		if (opt == 'v')
 			conf.verbose = true;
@@ -96,7 +96,7 @@ t_config	parseInput(int argc,char **argv)
 			fprintf(stderr, "Try 'ft_ping -?' for more information.\n");
 			exit(64);
 		}
-		else if (opt == 1002)
+		else if (opt == 'h' || opt == 1002)
 		{
 			print_usage();
 			exit(0);

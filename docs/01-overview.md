@@ -16,7 +16,7 @@ resolution.
 
 | Category | Features | Status |
 |----------|----------|--------|
-| **Mandatory (subject)** | IPv4 echo, `-v` verbose, `-?` help | Implemented |
+| **Mandatory (subject)** | IPv4 echo, `-v` verbose, `-?` / `-h` help | Implemented |
 | **Bonus (subject)** | `-f` flood, `-l` preload, `-n` numeric, `-w` deadline, `-W` linger, `-p` pattern, `-r` ignore-routing, `-s` size, `-T`/`--ip-timestamp`, `--ttl` | Partially implemented (see CLI reference) |
 | **Extra** | IPv6 (`-6`), long options (`--help`, `--usage`, `--ttl`, `--ip-timestamp`) | Implemented |
 
