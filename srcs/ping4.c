@@ -242,10 +242,10 @@ static void	print_summary(t_config *conf, t_logs *logs, double rtt_sq_sum,
 	}
 }
 
-static bool seen_seq[65536];
-
 int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 {
+	bool seen_seq[65536];
+
 	int fd = ipv4_icmp_socket(conf);
 	if (fd < 0) return -1;
 	signal(SIGINT, handle_sigint);

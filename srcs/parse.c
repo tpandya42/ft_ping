@@ -51,7 +51,7 @@ t_config	parseInput(int argc,char **argv)
 	conf.ip_ts = 0;
 	conf.ip_ts_type = 0;
 
-	static struct option long_options[] = {
+	struct option long_options[] = {
 		{"count", required_argument, 0, 'c'},
 		{"numeric", no_argument, 0, 'n'},
 		{"quiet", no_argument, 0, 'q'},

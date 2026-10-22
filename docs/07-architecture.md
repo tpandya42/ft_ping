@@ -170,7 +170,7 @@ flowchart TD
    - Extract timestamp from payload (after ICMP header).
    - RTT = `now - sent_ts` (both `CLOCK_MONOTONIC`).
    - `rseq = ntohs(seq)`.
-   - Duplicate check: `seen_seq[rseq]` (static `bool[65536]`).
+   - Duplicate check: `seen_seq[rseq]` (local `bool[65536]` per run).
    - Update `logs` (rec, rtt_sum, rtt_sq_sum, min/max).
    - `print_reply()`; if `ip_ts` enabled, `print_ip_opt()` (v4 only).
 3. **ICMP Error** (`type != 0/129`):
@@ -182,14 +182,14 @@ flowchart TD
 
 ## Duplicate Detection
 
-- Static array: `static bool seen_seq[65536];` (covers all `uint16_t`).
+- Local array: `bool seen_seq[65536];` inside the ping loop function (covers all `uint16_t`).
 - On Echo Reply: `duplicate = seen_seq[rseq]; seen_seq[rseq] = true;`.
 - If duplicate: `duplicates++` (not counted in `logs.rec` for loss calc).
 - RTT of duplicates still feeds min/max/avg/mdev.
 
 ## Signal Handling
 
-- Global: `static volatile sig_atomic_t g_sig = 0;`.
+- Global: `volatile sig_atomic_t g_sig = 0;` (defined in `main.c`, declared `extern` in the header).
 - `handle_sigint(int)` sets `g_sig = 1` (async-signal-safe).
 - Main loop checks `!g_sig` at top and after `recvmsg` timeout.
 - On interrupt: breaks loop, prints summary, exits with return code.
