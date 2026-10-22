@@ -103,16 +103,11 @@ int resolveIPv6DNS(t_config *conf) {
   `ping6 -I eth0 fe80::1`). `ft_ping` does not currently support `-I`
   interface specification; link-local may fail with "No route to host."
 
-## Debug Output
+## Resolution Output
 
-After successful resolution, `main.c` prints:
-
-```c
-printf("Hostname's ip: %s\n", conf.ip_str);   // IPv4
-printf("Hostname's ip: %s\n", conf.ip6_str);  // IPv6
-```
-
-This line is intentional (subject does not forbid it) and helps debugging.
+Resolution is silent. `main.c` passes the numeric IP string to the ping loop,
+which prints it only in the `PING <host> (<ip>): ...` header. No extra debug
+line is printed, keeping the output identical to inetutils-2.0.
 
 ## IPv4 vs IPv6 Resolution
 
@@ -122,7 +117,7 @@ This line is intentional (subject does not forbid it) and helps debugging.
 | `ai_family` | `AF_INET` | `AF_INET6` |
 | `sockaddr` | `struct sockaddr_in` | `struct sockaddr_in6` |
 | IP string buffer | `INET_ADDRSTRLEN` (16) | `INET6_ADDRSTRLEN` (46) |
-| Debug print | `conf.ip_str` | `conf.ip6_str` |
+| IP string | `conf.ip_str` (PING header) | `conf.ip6_str` (PING header) |
 
 ## No Reverse DNS — Design Decision
 
@@ -142,11 +137,11 @@ This is explicitly permitted by the subject.
 ```bash
 # IPv4
 sudo ./ft_ping -c 2 google.com
-# Should print "Hostname's ip: 142.250.x.x"
+# Should print: PING google.com (142.250.x.x): 56 data bytes
 
 # IPv6
 sudo ./ft_ping -6 -c 2 google.com
-# Should print "Hostname's ip: 2a00:1450:4001:800::200e"
+# Should print: PING google.com (2a00:1450:4001:800::200e): 56 data bytes
 
 # Numeric (no-op)
 sudo ./ft_ping -n -c 2 8.8.8.8

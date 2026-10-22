@@ -7,10 +7,6 @@ static void print_usage(void)
 	printf("Usage: ft_ping [OPTION...] HOST ...\n");
 	printf("Send ICMP ECHO_REQUEST packets to network hosts.\n\n");
 	printf("  -c, --count=NUMBER     stop after sending NUMBER packets\n");
-	printf("  -f, --flood            flood ping (root only)\n");
-	printf("  -i, --interval=NUMBER  wait NUMBER seconds between sending each packet\n");
-	printf("  -l, --preload=NUMBER   send NUMBER packets as fast as possible before\n");
-	printf("                           falling into normal mode of behavior\n");
 	printf("  -n, --numeric          do not resolve host addresses\n");
 	printf("  -q, --quiet            quiet output\n");
 	printf("  -r, --ignore-routing   send directly to a host on an attached network\n");
@@ -30,7 +26,7 @@ static void print_usage(void)
 
 static void print_short_usage(void)
 {
-	printf("Usage: ft_ping [-c COUNT] [-f] [-i INTERVAL] [-l PRELOAD] [-n] [-q] [-r] [-s SIZE]\n");
+	printf("Usage: ft_ping [-c COUNT] [-n] [-q] [-r] [-s SIZE]\n");
 	printf("                [-t TTL] [-T TOS] [--ip-timestamp=FLAG] [-v] [-w TIMEOUT] [-W LINGER]\n");
 	printf("                [-p PATTERN] [-6] [-?] HOST ...\n");
 }
@@ -57,9 +53,6 @@ t_config	parseInput(int argc,char **argv)
 
 	static struct option long_options[] = {
 		{"count", required_argument, 0, 'c'},
-		{"flood", no_argument, 0, 'f'},
-		{"interval", required_argument, 0, 'i'},
-		{"preload", required_argument, 0, 'l'},
 		{"numeric", no_argument, 0, 'n'},
 		{"quiet", no_argument, 0, 'q'},
 		{"ignore-routing", no_argument, 0, 'r'},
@@ -71,17 +64,39 @@ t_config	parseInput(int argc,char **argv)
 		{"timeout", required_argument, 0, 'w'},
 		{"linger", required_argument, 0, 'W'},
 		{"pattern", required_argument, 0, 'p'},
-		{"help", no_argument, 0, '?'},
+		{"help", no_argument, 0, 1002},
 		{"usage", no_argument, 0, 1001},
 		{0, 0, 0, 0}
 	};
 
+	for (int i = 1; i < argc; i++)
+	{
+		if (strcmp(argv[i], "-?") == 0)
+		{
+			print_usage();
+			exit(0);
+		}
+	}
+
 	int opt;
-	while ((opt = getopt_long(argc, argv, "v?6c:t:W:w:s:qnfp:rT:", long_options, NULL)) != -1)
+	opterr = 0;
+	while ((opt = getopt_long(argc, argv, ":v6c:t:W:w:s:qnp:rT:", long_options, NULL)) != -1)
 	{
 		if (opt == 'v')
 			conf.verbose = true;
+		else if (opt == ':')
+		{
+			fprintf(stderr, "ft_ping: option requires an argument -- '%c'\n", optopt);
+			fprintf(stderr, "Try 'ft_ping -?' for more information.\n");
+			exit(64);
+		}
 		else if (opt == '?')
+		{
+			fprintf(stderr, "ft_ping: unrecognized option '%s'\n", argv[optind - 1]);
+			fprintf(stderr, "Try 'ft_ping -?' for more information.\n");
+			exit(64);
+		}
+		else if (opt == 1002)
 		{
 			print_usage();
 			exit(0);

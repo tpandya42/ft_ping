@@ -18,13 +18,11 @@ int 	main(int argc, char **argv)
 	if(conf.ipv6){
 		if (resolveIPv6DNS(&conf) != 0)
 			return (1);
-		printf("Hostname's ip: %s\n", conf.ip6_str);
 		ret = ft_pingIpv6(&conf, &conf.target_addr6, conf.ip6_str);	
 	}
 	else {
 		if (resolveDNS(&conf) != 0)
 			return (1);
-		printf("Hostname's ip: %s\n", conf.ip_str);
 		ret = ft_pingIpv4(&conf, &conf.target_addr, conf.ip_str);	
 	}
 

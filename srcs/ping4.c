@@ -307,10 +307,18 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 		ssize_t sent_bytes = sendto(fd, packet, icmp_len, 0, (struct sockaddr *)target_addr, sizeof(*target_addr));
 		if (sent_bytes < 0) {
 			perror("ft_ping: sendto");
+			logs.sent++;
+			seq++;
+			if (!g_sig && (conf->count <= 0 || logs.sent < conf->count))
+			{
+				struct timespec sleep_ts = {1, 0};
+				nanosleep(&sleep_ts, NULL);
+			}
 			continue;
 		}
 		logs.sent++;
 
+		bool got_reply = false;
 		while (!g_sig)
 		{
 			char	buf[2048];
@@ -366,6 +374,7 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 					ip->ttl, rtt_ms, duplicate);
 				if (conf->ip_ts)
 					print_ip_opt(ip, iphdr_len);
+				got_reply = true;
 				break;
 			}
 			if (icmp->type == ICMP_ECHO)
@@ -404,7 +413,7 @@ int  ft_pingIpv4(t_config *conf, struct sockaddr_in *target_addr, char *ip_str)
 
 		seq++;
 
-		if (!g_sig && (conf->count <= 0 || logs.sent < conf->count))
+		if (!g_sig && got_reply && (conf->count <= 0 || logs.sent < conf->count))
 		{
 			struct timespec sleep_ts = {1, 0};
 			nanosleep(&sleep_ts, NULL);

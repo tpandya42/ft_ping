@@ -166,10 +166,18 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 		ssize_t sent_bytes = sendto(fd, packet, icmp_len, 0, (struct sockaddr *)target_addr, sizeof(*target_addr));
 		if (sent_bytes < 0) {
 			perror("ft_ping: sendto");
+			logs.sent++;
+			seq++;
+			if (!g_sig && (conf->count <= 0 || logs.sent < conf->count))
+			{
+				struct timespec sleep_ts = {1, 0};
+				nanosleep(&sleep_ts, NULL);
+			}
 			continue;
 		}
 		logs.sent++;
 
+		bool got_reply = false;
 		while (!g_sig)
 		{
 			char	buf[2048];
@@ -234,6 +242,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 				have_rtt = true;
 				print_reply(conf, from_addr, rseq, res,
 					hoplimit, rtt_ms, duplicate);
+				got_reply = true;
 				break;
 			}
 			if (icmp6->icmp6_type == ICMP6_ECHO_REQUEST)
@@ -272,7 +281,7 @@ int  ft_pingIpv6(t_config *conf, struct sockaddr_in6 *target_addr, char *ip_str)
 
 		seq++;
 
-		if (!g_sig && (conf->count <= 0 || logs.sent < conf->count))
+		if (!g_sig && got_reply && (conf->count <= 0 || logs.sent < conf->count))
 		{
 			struct timespec sleep_ts = {1, 0};
 			nanosleep(&sleep_ts, NULL);

@@ -166,7 +166,6 @@ the inetutils label `round-trip min/avg/max/stddev` for consistency.
 
 | Aspect | Difference |
 |--------|------------|
-| Debug line | `ft_ping` prints `Hostname's ip: <ip>` after DNS (subject permits). |
 | `-v` ID | `ft_ping` uses `pid & 0xFFFF`; inetutils uses same. Match. |
 | `-W` unit | `ft_ping` uses `-W` as per-packet timeout (ms); inetutils uses seconds linger. |
 | IPv6 header | inetutils has no IPv6 ping; `ft_ping -6` uses same style. |

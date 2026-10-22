@@ -123,6 +123,7 @@ flowchart TD
     T --> U{ip_ts?}
     U -->|yes| V[print_ip_opt]
     U -->|no| W[got_reply=true]
+    V --> W
     Q -->|no| X{ICMP Error?}
     X -->|yes| Y[Parse inner packet]
     Y --> Z{Ours or -v?}
@@ -132,12 +133,12 @@ flowchart TD
     X -->|no| AD[Continue]
     M --> AD
     O --> AE{got_reply?}
+    AE -->|yes| AG{!g_sig && more?}
     AE -->|no| AF[next sequence]
-    AE -->|yes| AF
-    AF --> AG{!g_sig && more?}
     AG -->|yes| AH[nanosleep 1s]
     AG -->|no| Z
     AH --> G
+    AF --> G
     Z --> AI[clock_gettime end]
     AI --> AJ[print_summary]
     AJ --> AK[close fd]
