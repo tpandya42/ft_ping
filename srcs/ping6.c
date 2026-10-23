@@ -78,7 +78,7 @@ static void	print_summary(t_config *conf, t_logs *logs, double rtt_sq_sum,
 	int	loss = 0;
 	if (logs->sent > 0)
 		loss = (logs->sent - logs->rec) * 100 / logs->sent;
-	printf("--- %s ping statistics ---\n", conf->hostname);
+	printf("\n--- %s ping statistics ---\n", conf->hostname);
 	if (duplicates > 0)
 		printf("%d packets transmitted, %d received, +%u duplicates, %d%% packet loss\n",
 			logs->sent, logs->rec, duplicates, loss);
