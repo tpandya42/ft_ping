@@ -21,7 +21,7 @@ int  ipv4_icmp_socket(t_config *conf)
 		return -1;
 	}
 
-	if (conf->ttl >= 0)
+	if (conf->ttl > 0)
 	{
 		int ttl = conf->ttl;
 		if (setsockopt(fd, IPPROTO_IP, IP_TTL, &ttl, sizeof(ttl)) < 0)
@@ -67,7 +67,7 @@ int  ipv6_icmp_socket(t_config *conf)
 		return -1;
 	}
 
-	if (conf->ttl >= 0)
+	if (conf->ttl > 0)
 	{
 		int ttl = conf->ttl;
 		if (setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, sizeof(ttl)) < 0)
