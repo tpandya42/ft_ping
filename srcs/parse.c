@@ -139,9 +139,9 @@ t_config	parseInput(int argc,char **argv)
 		}
 		else if (opt == 1000) {
 			if (strcmp(optarg, "tsonly") == 0)
-				conf.ip_ts_type = 1;
+				conf.ip_ts_type = 0;
 			else if (strcmp(optarg, "tsaddr") == 0)
-				conf.ip_ts_type = 3;
+				conf.ip_ts_type = 1;
 			else {
 				fprintf(stderr, "ft_ping: invalid timestamp flag: %s\n", optarg);
 				exit(64);
